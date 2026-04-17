@@ -1,30 +1,21 @@
-fx_version 'cerulean'
+fx_version 'adamant' -- Changed to adamant (common stable standard for RDR3)
 game 'rdr3'
 lua54 'yes'
 rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aware my resources *will* become incompatible once RedM ships.'
-description 'Atlas Skilling System - Core XP Manager'
+description 'Atlas Skilling System'
 author 'DrewPamment3'
 
--- Dependencies: This script won't load if these aren't running
-dependencies {
-    'vorp_core',
-    'oxmysql'
-}
+-- In modern manifests, we list dependencies like this:
+dependency 'vorp_core'
+dependency 'oxmysql'
 
--- Shared scripts (accessible by both client and server)
-shared_scripts {
-    'shared/config.lua'
-}
+shared_script 'shared/config.lua'
 
--- Client-side scripts (code that runs on the player's PC)
-client_scripts {
-    'client/main.lua'
-}
+client_script 'client/main.lua'
 
--- Server-side scripts (code that runs on the host/database)
-server_scripts {
-    'server/main.lua'
-}
+server_script 'server/main.lua'
 
--- Export the function so other resources can call it
-server_export 'AddSkillXP'
+-- Use exports instead of server_export for better compatibility
+exports {
+    'AddSkillXP'
+}
