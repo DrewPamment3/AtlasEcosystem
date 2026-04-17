@@ -6,9 +6,15 @@ print("^2[Atlas Debug]^7 Client script loaded. MenuKey is: " .. tostring(Config.
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        -- Check for 'K' or the 'checkskills' command
+        -- We'll use 0 as the control group (Global)
         if IsControlJustPressed(0, Config.MenuKey) then
-            print("^2[Atlas Debug]^7 'K' pressed. Sending request to server...")
+            print("^2[Atlas Debug]^7 'K' detected via IsControlJustPressed!")
+            TriggerServerEvent('atlas_skilling:getSkills')
+        end
+
+        -- BACKUP: If the above fails, this definitely won't
+        if IsDisabledControlJustPressed(0, Config.MenuKey) then
+            print("^2[Atlas Debug]^7 'K' detected via IsDisabledControlJustPressed!")
             TriggerServerEvent('atlas_skilling:getSkills')
         end
     end
@@ -60,4 +66,9 @@ AddEventHandler('atlas_skilling:openMenu', function(skillData)
     end, function(data, menu)
         menu.close()
     end)
+end)
+
+RegisterCommand('skilltest', function()
+    print("^2[Atlas Debug]^7 Command used. Triggering server...")
+    TriggerServerEvent('atlas_skilling:getSkills')
 end)
