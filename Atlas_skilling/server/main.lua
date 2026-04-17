@@ -71,6 +71,6 @@ function CheckForLevelUp(source, oldXP, newXP)
 
     if newLevel > oldLevel then
         TriggerClientEvent('atlas_skilling:levelUp', source, newLevel)
-        print("^3[Atlas Skilling]^7 Player " .. source .. " leveled up to " .. newLevel)
+        print("^3[Atlas Skilling]^7 Player " .. source .. " has leveled up to " .. newLevel)
     end
 end
