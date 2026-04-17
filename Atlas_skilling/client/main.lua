@@ -1,27 +1,31 @@
 local VORPcore = exports.vorp_core:GetCore()
 local VORPMenu = exports.vorp_menu:GetMenuData()
 
--- 1. KEY LISTENER
--- Checks every frame if the key from Config is pressed
+print("^2[Atlas Debug]^7 Client script loaded. MenuKey is: " .. tostring(Config.MenuKey))
+
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
+        -- Check for 'K' or the 'checkskills' command
         if IsControlJustPressed(0, Config.MenuKey) then
-            -- Ask the server for our skill data
+            print("^2[Atlas Debug]^7 'K' pressed. Sending request to server...")
             TriggerServerEvent('atlas_skilling:getSkills')
         end
     end
 end)
 
--- 2. MENU RENDERER
--- This runs when the server sends back the database row
 RegisterNetEvent('atlas_skilling:openMenu')
 AddEventHandler('atlas_skilling:openMenu', function(skillData)
-    VORPMenu.CloseAll()
+    print("^2[Atlas Debug]^7 Received skill data from server. Opening Menu...")
 
+    if not VORPMenu then
+        print("^1[Atlas Error]^7 VORP Menu export is nil! Is vorp_menu started?")
+        return
+    end
+
+    VORPMenu.CloseAll()
     local elements = {}
 
-    -- Map the labels to the database column names
     local skillsToDisplay = {
         { label = "Woodcutting", xp = skillData.woodcutting_xp },
         { label = "Mining",      xp = skillData.mining_xp },
@@ -37,9 +41,7 @@ AddEventHandler('atlas_skilling:openMenu', function(skillData)
     }
 
     for _, skill in ipairs(skillsToDisplay) do
-        -- Use the formula from Config
         local level = math.floor(math.sqrt(skill.xp / Config.XPFormulaDivisor)) + 1
-
         if level > Config.MaxLevel then level = Config.MaxLevel end
 
         table.insert(elements, {
@@ -54,29 +56,8 @@ AddEventHandler('atlas_skilling:openMenu', function(skillData)
         align = 'top-right',
         elements = elements
     }, function(data, menu)
-        -- Placeholder for clicking a skill
+        menu.close()
     end, function(data, menu)
         menu.close()
     end)
-end)
-
--- 3. XP NOTIFICATION
-RegisterNetEvent('atlas_skilling:xpNotification')
-AddEventHandler('atlas_skilling:xpNotification', function(skill, amount, totalXP)
-    local skillLabel = skill:gsub("^%l", string.upper)
-
-    VORPcore.NotifyTop(
-        "~t6~" .. skillLabel .. " XP",
-        "Gained ~t2~+" .. amount .. " ~q~XP (Total: " .. totalXP .. ")",
-        4000
-    )
-
-    PlaySoundFrontend("SELECT", "HUD_SHOP_SOUNDSET", true, 0)
-end)
-
--- 4. LEVEL UP UI
-RegisterNetEvent('atlas_skilling:levelUp')
-AddEventHandler('atlas_skilling:levelUp', function(newLevel)
-    VORPcore.NotifyCenter("~t6~LEVEL UP! ~q~You are now Level " .. newLevel, 5000)
-    PlaySoundFrontend("PE_RANK_UP", "HUD_AWARDS_SOUNDSET", true, 0)
 end)
