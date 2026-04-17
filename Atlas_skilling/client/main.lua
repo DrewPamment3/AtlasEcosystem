@@ -1,31 +1,23 @@
 local VORPcore = exports.vorp_core:GetCore()
 local VORPMenu = exports.vorp_menu:GetMenuData()
 
-print("^2[Atlas Debug]^7 Client script loaded. MenuKey is: " .. tostring(Config.MenuKey))
+-- 1. THE COMMAND & KEY MAPPING
+-- This replaces the "while true" loop. More performant and ignores native blocks.
+RegisterCommand('+openskills', function()
+    print("^2[Atlas Debug]^7 Opening Skills Menu...")
+    TriggerServerEvent('atlas_skilling:getSkills')
+end, false)
 
+-- This binds the 'K' key to the '+openskills' command globally.
 Citizen.CreateThread(function()
-    while true do
-        Citizen.Wait(0)
-        -- We'll use 0 as the control group (Global)
-        if IsControlJustPressed(0, Config.MenuKey) then
-            print("^2[Atlas Debug]^7 'K' detected via IsControlJustPressed!")
-            TriggerServerEvent('atlas_skilling:getSkills')
-        end
-
-        -- BACKUP: If the above fails, this definitely won't
-        if IsDisabledControlJustPressed(0, Config.MenuKey) then
-            print("^2[Atlas Debug]^7 'K' detected via IsDisabledControlJustPressed!")
-            TriggerServerEvent('atlas_skilling:getSkills')
-        end
-    end
+    RegisterKeyMapping('+openskills', 'Open Atlas Skills Menu', 'keyboard', 'K')
 end)
 
+-- 2. MENU RENDERER
 RegisterNetEvent('atlas_skilling:openMenu')
 AddEventHandler('atlas_skilling:openMenu', function(skillData)
-    print("^2[Atlas Debug]^7 Received skill data from server. Opening Menu...")
-
     if not VORPMenu then
-        print("^1[Atlas Error]^7 VORP Menu export is nil! Is vorp_menu started?")
+        print("^1[Atlas Error]^7 VORP Menu export is nil! Check if vorp_menu is started.")
         return
     end
 
@@ -68,7 +60,18 @@ AddEventHandler('atlas_skilling:openMenu', function(skillData)
     end)
 end)
 
-RegisterCommand('skilltest', function()
-    print("^2[Atlas Debug]^7 Command used. Triggering server...")
-    TriggerServerEvent('atlas_skilling:getSkills')
+-- 3. XP NOTIFICATION
+RegisterNetEvent('atlas_skilling:xpNotification')
+AddEventHandler('atlas_skilling:xpNotification', function(skill, amount, totalXP)
+    local skillLabel = skill:gsub("^%l", string.upper)
+    VORPcore.NotifyTop("~t6~" .. skillLabel .. " XP", "Gained ~t2~+" .. amount .. " ~q~XP (Total: " .. totalXP .. ")",
+        4000)
+    PlaySoundFrontend("SELECT", "HUD_SHOP_SOUNDSET", true, 0)
+end)
+
+-- 4. LEVEL UP UI
+RegisterNetEvent('atlas_skilling:levelUp')
+AddEventHandler('atlas_skilling:levelUp', function(newLevel)
+    VORPcore.NotifyCenter("~t6~LEVEL UP! ~q~You are now Level " .. newLevel, 5000)
+    PlaySoundFrontend("PE_RANK_UP", "HUD_AWARDS_SOUNDSET", true, 0)
 end)
