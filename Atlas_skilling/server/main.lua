@@ -33,8 +33,8 @@ AddEventHandler('atlas_skilling:getSkills', function()
         end)
 end)
 
--- 2. THE XP MANAGER LOGIC
-local function AddSkillXP_Internal(source, skill, amount, personalMult)
+-- 2. THE XP MANAGER (Global function for manifest export)
+function AddSkillXP(source, skill, amount, personalMult)
     local User = VORPcore.getUser(source)
     if not User then return end
 
@@ -68,8 +68,6 @@ local function AddSkillXP_Internal(source, skill, amount, personalMult)
         end)
 end
 
-exports('AddSkillXP', AddSkillXP_Internal)
-
 -- 3. ADMIN COMMAND
 RegisterCommand('givexp', function(source, args)
     local _source = source
@@ -99,7 +97,8 @@ RegisterCommand('givexp', function(source, args)
         if targetID and skillName and amount then
             local Target = VORPcore.getUser(targetID)
             if Target and Target.getUsedCharacter then
-                AddSkillXP_Internal(targetID, skillName, amount)
+                -- Calling the global function directly
+                AddSkillXP(targetID, skillName, amount)
                 if _source ~= 0 then
                     VORPcore.NotifyRightTip(_source, "Granted " .. amount .. " XP to ID " .. targetID, 4000)
                 end
@@ -111,7 +110,7 @@ RegisterCommand('givexp', function(source, args)
             print('^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]')
         end
     else
-        local denyMsg = "Access Denied. Your group is [" .. userGroup .. "]. Required: admin."
+        local denyMsg = "Access Denied. Group: [" .. userGroup .. "]. Required: admin."
         if _source ~= 0 then VORPcore.NotifyRightTip(_source, denyMsg, 6000) end
         print("^1[Atlas Admin Auth]^7 " .. denyMsg)
     end
