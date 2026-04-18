@@ -1,33 +1,33 @@
 local isBusy = false
 
 --- @section Detection Logic
+-- Uses a Sphere Sweep to detect tree trunks in a 3D volume
 local function GetTreeInFront()
     local playerPed = PlayerPedId()
     local pCoords = GetEntityCoords(playerPed)
     local pForward = GetEntityForwardVector(playerPed)
-    local distance = 2.5 -- Increased slightly for easier detection
 
-    -- Start 1 meter above ground to hit the trunk, not the dirt
-    local startX, startY, startZ = pCoords.x, pCoords.y, pCoords.z + 1.2
-    local destX = startX + (pForward.x * distance)
-    local destY = startY + (pForward.y * distance)
-    local destZ = startZ + (pForward.z * distance)
+    -- Start the sweep 1 meter BEHIND the player and end 3 meters IN FRONT
+    -- This ensures we catch the tree even if we are standing right against it
+    local start = pCoords - (pForward * 1.0) + vec3(0, 0, 1.0)
+    local target = pCoords + (pForward * 3.0) + vec3(0, 0, 1.0)
 
-    -- Flag -1 hits everything. 0.5 radius capsule is a thick beam.
-    local rayHandle = StartShapeTestCapsule(startX, startY, startZ, destX, destY, destZ, 0.5, -1, playerPed, 0)
+    -- Flag 273: 1 (Map) + 16 (Objects) + 256 (Foliage)
+    -- Radius 1.2: A thick sphere to ensure we hit the trunk
+    local rayHandle = StartShapeTestSphere(start.x, start.y, start.z, target.x, target.y, target.z, 1.2, 273, playerPed,
+        7)
     local _, hit, hitCoords, _, entityHit = GetShapeTestResult(rayHandle)
 
-    -- DEBUG: This will always print when you press G, even if it hits nothing
-    print(string.format("^3[Atlas Debug]^7 Raycast Hit: %s | EntityHandle: %s", hit, entityHit))
-
-    if hit == 1 and entityHit ~= 0 then
+    -- DEBUG: This will show if we hit ANY world collision
+    if hit ~= 0 then
         local model = GetEntityModel(entityHit)
-        local eType = GetEntityType(entityHit)
+        print(string.format("^3[Atlas Debug]^7 Hit: %s | Entity: %s | Model: %s", hit, entityHit, model))
 
-        -- Logging what we found
-        print(string.format("^2[Atlas Woodcutting]^7 Found Model: %s | Type: %s", model, eType))
-
-        return entityHit, hitCoords, model
+        if entityHit ~= 0 then
+            return entityHit, hitCoords, model
+        end
+    else
+        print("^3[Atlas Debug]^7 Raycast missed everything. Walk closer or face the trunk directly.")
     end
 
     return nil
@@ -42,11 +42,13 @@ Citizen.CreateThread(function()
         if IsControlJustReleased(0, 0x760A9C6F) and not isBusy then
             local entity, coords, model = GetTreeInFront()
 
-            if entity and Config.Trees[model] then
-                TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', coords)
-            elseif entity then
-                -- This helps you see why a tree ISN'T working (it's not in your config)
-                print("^1[Atlas Woodcutting]^7 This model (" .. model .. ") is not in Config.Trees!")
+            if entity then
+                if Config.Trees[model] then
+                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', coords)
+                else
+                    -- Found a model, but it's not in our list
+                    print("^1[Atlas Woodcutting]^7 Unregistered Tree Model: " .. model)
+                end
             end
         end
     end
@@ -58,6 +60,7 @@ AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     isBusy = true
     local playerPed = PlayerPedId()
 
+    print("^2[Atlas Woodcutting]^7 Starting chop...")
     TaskStartScenarioInPlace(playerPed, `WORLD_HUMAN_TREE_CHOP`, -1, true)
 
     Citizen.Wait(Config.MinChopTime)
@@ -65,6 +68,6 @@ AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     ClearPedTasks(playerPed)
     isBusy = false
 
-    -- Hardcoded 'crude_axe' for initial testing
+    -- Finalize with the server
     TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token, "crude_axe")
 end)
