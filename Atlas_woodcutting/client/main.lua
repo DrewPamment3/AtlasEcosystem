@@ -71,3 +71,19 @@ AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     -- Finalize with the server
     TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token, "crude_axe")
 end)
+
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        local playerPed = PlayerPedId()
+        local pCoords = GetEntityCoords(playerPed)
+        local pForward = GetEntityForwardVector(playerPed)
+
+        -- Match the math in your GetTreeInFront function
+        local start = pCoords + vec3(0, 0, 1.2)
+        local target = start + (pForward * 2.5)
+
+        -- DrawLine(startX, startY, startZ, endX, endY, endZ, R, G, B, Alpha)
+        DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255)
+    end
+end)
