@@ -26,3 +26,21 @@ Config.Trees = {
 }
 
 Config.MinChopTime = 5000 -- 5 seconds minimum to prevent speed-hacking
+
+Config = {}
+
+-- Add this block specifically
+Config.TreeMaterials = {
+    [1184711311] = true,  -- WOOD_SOLID
+    [-1184711311] = true, -- Signed variant
+}
+
+-- Keep your existing tree list for specific entity detection
+Config.Trees = {
+    [1035651700] = { name = "Pine", xp = 25 },
+    [1998592543] = { name = "Oak", xp = 40 },
+}
+
+Config.MinChopTime = 5000
+
+-- Ensure other configs (AxeTiers, WoodTiers) follow...
