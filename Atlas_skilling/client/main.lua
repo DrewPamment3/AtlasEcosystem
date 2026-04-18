@@ -1,17 +1,12 @@
 local VORPcore = exports.vorp_core:GetCore()
 local VORPMenu = exports.vorp_menu:GetMenuData()
 
--- 1. THE COMMAND & KEY MAPPING
--- This replaces the "while true" loop. More performant and ignores native blocks.
-RegisterCommand('+openskills', function()
-    print("^2[Atlas Debug]^7 Opening Skills Menu...")
+-- 1. THE COMMAND
+-- Usage: Type /skills in chat to open the menu
+RegisterCommand('skills', function()
+    print("^2[Atlas Debug]^7 Opening Skills Menu via command...")
     TriggerServerEvent('atlas_skilling:getSkills')
 end, false)
-
--- This binds the 'K' key to the '+openskills' command globally.
-Citizen.CreateThread(function()
-    RegisterKeyMapping('+openskills', 'Open Atlas Skills Menu', 'keyboard', 'K')
-end)
 
 -- 2. MENU RENDERER
 RegisterNetEvent('atlas_skilling:openMenu')
