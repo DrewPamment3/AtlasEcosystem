@@ -6,19 +6,25 @@ local function GetTreeInFront()
     local playerPed = PlayerPedId()
     local pCoords = GetEntityCoords(playerPed)
     local pForward = GetEntityForwardVector(playerPed)
-    local distance = 2.5
+    local distance = 1.5 -- Keep it close for immersion
 
-    -- Calculate destination point based on forward vector
-    local destination = pCoords + (pForward * distance)
+    -- Start the ray at chest height (Z + 1.0)
+    local startCoords = vec3(pCoords.x, pCoords.y, pCoords.z + 1.0)
+    local destination = startCoords + (pForward * distance)
 
-    -- Flag 17 (1 | 16) targets both Map Objects and Scripted Props
-    local rayHandle = StartShapeTestRay(pCoords.x, pCoords.y, pCoords.z, destination.x, destination.y, destination.z, 17,
-        playerPed, 0)
+    -- StartShapeTestCapsule: Radius 0.5 creates a "thick" line to catch tree trunks
+    -- Flag -1: Hits everything (we filter manually)
+    local rayHandle = StartShapeTestCapsule(startCoords.x, startCoords.y, startCoords.z, destination.x, destination.y,
+        destination.z, 0.5, -1, playerPed, 0)
     local _, hit, hitCoords, _, entityHit = GetShapeTestResult(rayHandle)
 
     if hit == 1 and entityHit ~= 0 then
-        local model = GetEntityModel(entityHit)
-        return entityHit, hitCoords, model
+        -- Check if the entity is actually an Object (Type 3)
+        -- Many RDR3 trees are type 3 props
+        if GetEntityType(entityHit) == 3 then
+            local model = GetEntityModel(entityHit)
+            return entityHit, hitCoords, model
+        end
     end
     return nil
 end
