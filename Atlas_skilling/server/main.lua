@@ -57,7 +57,6 @@ local function AddSkillXP_Internal(source, skill, amount, personalMult)
 
                 TriggerClientEvent('atlas_skilling:xpNotification', source, skill, finalAmount, newXP)
 
-                -- Level Logic
                 local oldLevel = math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
                 local newLevel = math.floor(math.sqrt(newXP / Config.XPFormulaDivisor)) + 1
 
