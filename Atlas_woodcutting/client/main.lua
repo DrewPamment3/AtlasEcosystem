@@ -1,17 +1,17 @@
 local isBusy = false
 
--- Function to find what is in front of the player
+--- @section Detection Logic
+-- Checks what is directly in front of the player ped
 local function GetTreeInFront()
     local playerPed = PlayerPedId()
     local pCoords = GetEntityCoords(playerPed)
     local pForward = GetEntityForwardVector(playerPed)
-    local distance = 2.5 -- How far the player can reach
+    local distance = 2.5
 
-    -- Calculate the point in front of the player
+    -- Calculate destination point based on forward vector
     local destination = pCoords + (pForward * distance)
 
-    -- Flag 16 is for Objects (trees/props). Flag 1 is for Map objects.
-    -- We use a combination to ensure we hit static world trees.
+    -- Flag 17 (1 | 16) targets both Map Objects and Scripted Props
     local rayHandle = StartShapeTestRay(pCoords.x, pCoords.y, pCoords.z, destination.x, destination.y, destination.z, 17,
         playerPed, 0)
     local _, hit, hitCoords, _, entityHit = GetShapeTestResult(rayHandle)
@@ -23,51 +23,48 @@ local function GetTreeInFront()
     return nil
 end
 
--- Main Interaction Thread
+--- @section Interaction Loop
+-- Main thread for input detection
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(0) -- 0ms while checking for input
+        Citizen.Wait(0)
 
-        -- Use your preferred key (e.g., [E] / INPUT_CONTEXT)
-        if IsControlJustReleased(0, `INPUT_CONTEXT`) and not isBusy then
+        -- 0x760A9C6F: [G] key (INPUT_INTERACT_ANIMAL)
+        if IsControlJustReleased(0, 0x760A9C6F) and not isBusy then
             local entity, coords, model = GetTreeInFront()
 
-            -- Debug: Uncomment the line below to see hashes of objects you look at in F8
-            if entity then print("Hit Model Hash: " .. model) end
+            -- Debugging: Prints hashes to F8 console to help build your Config.Trees list
+            if entity then
+                print("^2[Atlas Woodcutting]^7 Found Model Hash: " .. model)
+            end
 
             if entity and Config.Trees[model] then
-                -- Trigger server to check inventory and start session
+                -- Request the secure session from the server
                 TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', coords)
             end
         end
     end
 end)
 
--- Server acknowledges and tells client to start "working"
+--- @section Event Handlers
+-- Triggered by server after successful validation of position and tools
 RegisterNetEvent('Atlas_Woodcutting:Client:BeginMinigame')
 AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     isBusy = true
-
     local playerPed = PlayerPedId()
 
-    -- 1. Start Animation
+    -- Start the woodcutting scenario
     TaskStartScenarioInPlace(playerPed, `WORLD_HUMAN_TREE_CHOP`, -1, true)
 
-    -- 2. VORP Progress Bar (Simulated Minigame for now)
-    -- exports['vorp_progressbar']:start("Chopping Tree...", Config.MinChopTime, function(wait)
-    --     if not wait then
-    --         -- Completion logic
-    --     end
-    -- end)
-
-    -- For testing without the progress bar script installed yet:
+    -- Placeholder for work duration
+    -- In the future, replace this Wait with a proper VORP or custom Minigame export
     Citizen.Wait(Config.MinChopTime)
 
-    -- 3. Cleanup
+    -- Stop animation and reset busy status
     ClearPedTasks(playerPed)
     isBusy = false
 
-    -- 4. Tell server we are done.
-    -- NOTE: In a real scenario, we'd pass the actual axe name from inventory.
+    -- Finalize: Send token back to server to receive XP and Loot
+    -- Note: 'crude_axe' is hardcoded here for initial testing
     TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token, "crude_axe")
 end)
