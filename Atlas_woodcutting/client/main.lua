@@ -107,3 +107,31 @@ AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     isBusy = false
     TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token)
 end)
+
+RegisterCommand('testspawn', function(source, args)
+    local modelName = args[1] or "p_campfire01x"
+    local hash = GetHashKey(modelName)
+
+    print("^3[Atlas]^7 Testing spawn for: " .. modelName .. " (Hash: " .. hash .. ")")
+
+    RequestModel(hash)
+    local timeout = 0
+    while not HasModelLoaded(hash) and timeout < 100 do
+        Citizen.Wait(10)
+        timeout = timeout + 1
+    end
+
+    if HasModelLoaded(hash) then
+        local p = GetEntityCoords(PlayerPedId())
+        local forward = GetEntityForwardVector(PlayerPedId())
+        local spawnPos = p + (forward * 3.0)
+
+        local obj = CreateObject(hash, spawnPos.x, spawnPos.y, spawnPos.z, true, false, false)
+        PlaceObjectOnGroundProperly(obj)
+        FreezeEntityPosition(obj, true)
+
+        print("^2[Atlas]^7 SUCCESS! Object spawned. Handle: " .. obj)
+    else
+        print("^1[Atlas]^7 FAILED: Engine still refuses to load " .. modelName)
+    end
+end)
