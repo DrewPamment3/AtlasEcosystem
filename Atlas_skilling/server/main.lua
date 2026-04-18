@@ -30,8 +30,9 @@ AddEventHandler('atlas_skilling:getSkills', function()
         end)
 end)
 
--- 2. THE XP MANAGER
-exports('AddSkillXP', function(source, skill, amount, personalMult)
+-- 2. THE XP MANAGER LOGIC
+-- Internal function so the script can call itself without using exports
+local function AddSkillXP_Internal(source, skill, amount, personalMult)
     local Character = VORPcore.getUser(source).getUsedCharacter
     if not Character then return end
 
@@ -39,7 +40,7 @@ exports('AddSkillXP', function(source, skill, amount, personalMult)
     local skillColumn = string.lower(skill) .. "_xp"
     local pMult = personalMult or 1.0
 
-    -- REFERENCING CONFIG: Using Config.GlobalXPMultiplier from shared/config.lua
+    -- Using Config from shared/config.lua
     local finalAmount = math.floor(amount * Config.GlobalXPMultiplier * pMult)
 
     exports.oxmysql:scalar('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?',
@@ -47,7 +48,6 @@ exports('AddSkillXP', function(source, skill, amount, personalMult)
             if currentXP ~= nil then
                 local newXP = currentXP + finalAmount
 
-                -- REFERENCING CONFIG: Using Config.MaxXP
                 if newXP > Config.MaxXP then newXP = Config.MaxXP end
 
                 exports.oxmysql:execute('UPDATE character_skills SET ' .. skillColumn .. ' = ? WHERE charidentifier = ?',
@@ -57,11 +57,13 @@ exports('AddSkillXP', function(source, skill, amount, personalMult)
                 CheckForLevelUp(source, currentXP, newXP)
             end
         end)
-end)
+end
 
--- 3. LEVEL LOGIC (Synced with Config)
+-- Register the internal function as an export for OTHER resources
+exports('AddSkillXP', AddSkillXP_Internal)
+
+-- 3. LEVEL LOGIC
 function GetLevelFromXP(xp)
-    -- REFERENCING CONFIG: Using Config.XPFormulaDivisor
     return math.floor(math.sqrt(xp / Config.XPFormulaDivisor)) + 1
 end
 
@@ -77,12 +79,11 @@ end
 
 -- 4. ADMIN COMMAND: Grant XP
 -- Usage: /givexp [ID] [SKILL] [AMOUNT]
--- Example: /givexp 1 woodcutting 500
 RegisterCommand('givexp', function(source, args)
     local _source = source
     local canExecute = false
 
-    -- 1. Console (source 0) always has permission
+    -- Console (source 0) or Admin/Superadmin groups
     if _source == 0 then
         canExecute = true
     else
@@ -92,17 +93,16 @@ RegisterCommand('givexp', function(source, args)
         end
     end
 
-    -- 2. Execute if permitted
     if canExecute then
         local targetID = tonumber(args[1])
         local skillName = args[2] and tostring(args[2]):lower() or nil
         local amount = tonumber(args[3])
 
         if targetID and skillName and amount then
-            -- Verify target exists
             local Target = VORPcore.getUser(targetID)
             if Target then
-                exports.atlas_skilling:AddSkillXP(targetID, skillName, amount)
+                -- Direct call to the internal function to avoid "No such export" errors
+                AddSkillXP_Internal(targetID, skillName, amount)
 
                 if _source ~= 0 then
                     VORPcore.NotifyRightTip(_source, "Granted " .. amount .. " XP to ID " .. targetID, 4000)
