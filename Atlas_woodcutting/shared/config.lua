@@ -31,14 +31,16 @@ Config = {}
 
 -- Add this block specifically
 Config.TreeMaterials = {
-    [1184711311] = true,  -- WOOD_SOLID
-    [-1184711311] = true, -- Signed variant
+    [1184711311] = true, -- WOOD_SOLID
+    [7587075] = true,    -- Wood/Bark found in trace
+    [10008579] = true,   -- Another wood material found
 }
 
 -- Keep your existing tree list for specific entity detection
 Config.Trees = {
-    [1035651700] = { name = "Pine", xp = 25 },
-    [1998592543] = { name = "Oak", xp = 40 },
+    [1771086077] = { name = "Tree", xp = 25 },
+    [-1622460480] = { name = "Tree", xp = 25 },
+    [-1775485061] = { name = "Tree", xp = 25 },
 }
 
 Config.MinChopTime = 5000
