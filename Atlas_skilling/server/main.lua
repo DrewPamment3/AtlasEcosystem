@@ -82,14 +82,20 @@ end
 RegisterCommand('givexp', function(source, args)
     local _source = source
     local canExecute = false
+    local userGroup = "none"
 
-    -- Console (source 0) or Admin/Superadmin groups
+    -- 1. Console (source 0) or Admin/Superadmin groups
     if _source == 0 then
         canExecute = true
     else
         local User = VORPcore.getUser(_source)
-        if User and (User.group == 'admin' or User.group == 'superadmin') then
-            canExecute = true
+        if User then
+            userGroup = User.group or "user" -- Fallback to 'user' string if nil
+            if userGroup == 'admin' or userGroup == 'superadmin' then
+                canExecute = true
+            end
+        else
+            userGroup = "invalid_session"
         end
     end
 
@@ -100,8 +106,8 @@ RegisterCommand('givexp', function(source, args)
 
         if targetID and skillName and amount then
             local Target = VORPcore.getUser(targetID)
-            if Target then
-                -- Direct call to the internal function to avoid "No such export" errors
+            if Target and Target.getUsedCharacter then
+                -- Direct call to the internal function
                 AddSkillXP_Internal(targetID, skillName, amount)
 
                 if _source ~= 0 then
@@ -109,12 +115,20 @@ RegisterCommand('givexp', function(source, args)
                 end
                 print('^2[Atlas Admin]^7 Granted ' .. amount .. ' XP in ' .. skillName .. ' to ID: ' .. targetID)
             else
-                print('^1[Atlas Admin Error]^7 Target ID ' .. targetID .. ' not found.')
+                local errorMsg = "^1[Atlas Admin Error]^7 Target ID " ..
+                    targetID .. " not found or character not loaded."
+                if _source ~= 0 then VORPcore.NotifyRightTip(_source, "Target not found.", 4000) end
+                print(errorMsg)
             end
         else
-            print('^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]')
+            local usageMsg = "^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]"
+            if _source ~= 0 then VORPcore.NotifyRightTip(_source, "Invalid Arguments.", 4000) end
+            print(usageMsg)
         end
     else
-        VORPcore.NotifyRightTip(_source, "You do not have permission to use this.", 4000)
+        -- VERBOSE DEBUGGING
+        local denyMsg = "Access Denied. Your group is [" .. userGroup .. "]. Required: [admin] or [superadmin]."
+        VORPcore.NotifyRightTip(_source, denyMsg, 6000)
+        print("^1[Atlas Admin Auth]^7 " .. denyMsg .. " (Source: " .. _source .. ")")
     end
 end, false)
