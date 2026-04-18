@@ -26,7 +26,6 @@ Config.Trees = {
     -- Add more as needed
 }
 
-Config.MinChopTime = 5000 -- 5 seconds minimum to prevent speed-hacking
 
 Config = {}
 
@@ -38,11 +37,9 @@ Config.TreeMaterials = {
     [1697541] = true,
 }
 
--- Keep your existing tree list for specific entity detection
-Config.Trees = {
-    [1771086077] = { name = "Tree", xp = 25 },
-    [-1622460480] = { name = "Tree", xp = 25 },
-    [-1775485061] = { name = "Tree", xp = 25 },
+Config.RestrictedZones = {
+    { coords = vec3(921.70, -708.30, 69.17), radius = 10.0, name = 'New Restricted Zone' },
+    -- Add more lines here as you find them
 }
 
 Config.MinChopTime = 5000
