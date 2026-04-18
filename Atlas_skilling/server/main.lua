@@ -116,6 +116,5 @@ RegisterCommand('givexp', function(source, args)
         end
     else
         VORPcore.NotifyRightTip(_source, "You do not have permission to use this.", 4000)
-        VORPcore.NotifyRightTip(_source, User.group tostring(), 4000)
     end
 end, false)
