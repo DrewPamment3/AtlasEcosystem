@@ -1,5 +1,3 @@
-print("^3[Atlas]^7 Client script loaded. Waiting for initialization...")
-
 local isBusy = false
 local LocalTrees = {}
 
@@ -12,72 +10,61 @@ local function DrawTxt(text, x, y)
 end
 
 -- [[ SPAWNING ]]
-
 local function SpawnLocalTree(node)
-    local model = node.model_hash
-    print(string.format("^3[Atlas Debug]^7 Processing node: %s at %.2f, %.2f", model, node.x, node.y))
+    local modelName = node.model_name
+    local modelHash = GetHashKey(modelName)
 
-    if not IsModelInCdimage(model) then
-        return print("^1[Atlas Debug]^7 ERROR: Model " .. model .. " is not in the game files.")
+    print("^3[Atlas]^7 Requesting: " .. modelName)
+
+    if not IsModelInCdimage(modelHash) then
+        return print("^1[Atlas]^7 ERROR: Model '" .. modelName .. "' not in manifest.")
     end
 
-    RequestModel(model)
+    RequestModel(modelHash)
     local timeout = 0
-    while not HasModelLoaded(model) and timeout < 100 do
+    while not HasModelLoaded(modelHash) and timeout < 100 do
         Citizen.Wait(10)
         timeout = timeout + 1
     end
 
-    if HasModelLoaded(model) then
-        local tree = CreateObject(model, node.x, node.y, node.z, false, false, false)
-        if DoesEntityExist(tree) then
-            FreezeEntityPosition(tree, true)
-            SetEntityAsMissionEntity(tree, true, true)
-            LocalTrees[tree] = true
-            SetModelAsNoLongerNeeded(model)
-            print("^2[Atlas Debug]^7 Successfully spawned tree handle: " .. tree)
-        else
-            print("^1[Atlas Debug]^7 FAILED to create object despite model being loaded.")
-        end
+    if HasModelLoaded(modelHash) then
+        local tree = CreateObject(modelHash, node.x, node.y, node.z, false, false, false)
+        FreezeEntityPosition(tree, true)
+        SetEntityAsMissionEntity(tree, true, true)
+        LocalTrees[tree] = true
+        SetModelAsNoLongerNeeded(modelHash)
+        print("^2[Atlas]^7 Spawned: " .. modelName .. " (Handle: " .. tree .. ")")
     else
-        print("^1[Atlas Debug]^7 FAILED to load model: " .. model .. " (Timeout)")
+        print("^1[Atlas]^7 FAILED to load: " .. modelName)
     end
 end
 
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
 AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
-    print("^2[Atlas Debug]^7 SYNC RECEIVED. Node Count: " .. #nodes)
-
-    -- Cleanup existing
     for entity, _ in pairs(LocalTrees) do
         if DoesEntityExist(entity) then DeleteEntity(entity) end
     end
     LocalTrees = {}
-
-    for i, node in ipairs(nodes) do
-        SpawnLocalTree(node)
-    end
-    print("^2[Atlas Debug]^7 Sync sequence complete.")
+    for _, node in ipairs(nodes) do SpawnLocalTree(node) end
 end)
 
--- Initial Sync Request
+RegisterNetEvent('Atlas_Woodcutting:Client:SpawnSingleNode')
+AddEventHandler('Atlas_Woodcutting:Client:SpawnSingleNode', function(node)
+    SpawnLocalTree(node)
+end)
+
 Citizen.CreateThread(function()
-    print("^3[Atlas Debug]^7 Waiting 5s to ping server...")
     Citizen.Wait(5000)
-    print("^3[Atlas Debug]^7 Pinging server for nodes...")
     TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 end)
 
 RegisterCommand('refresh_trees', function()
-    print("^3[Atlas Debug]^7 Manual refresh triggered.")
     TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 end)
 
 -- [[ GENERATION ]]
-
 RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count, modelName)
-    print("^3[Atlas]^7 Generation started for Forest " .. forestId)
     for i = 1, count do
         local angle = math.random() * 2 * math.pi
         local r = radius * math.sqrt(math.random())
@@ -86,27 +73,20 @@ AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestI
         local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
 
         if foundGround then
-            print("^2[Atlas]^7 Node " .. i .. " ground found at " .. groundZ)
             TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', forestId, vec3(x, y, groundZ), modelName)
-        else
-            print("^1[Atlas]^7 Node " .. i .. " FAILED to find ground.")
         end
-        Citizen.Wait(500)
+        Citizen.Wait(300)
     end
 end)
 
 -- [[ INTERACTION ]]
-
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        local playerPed = PlayerPedId()
-        local pCoords = GetEntityCoords(playerPed)
-        local pForward = GetEntityForwardVector(playerPed)
-
-        local start = pCoords + vec3(0, 0, 1.0)
-        local target = pCoords + (pForward * 2.2) + vec3(0, 0, 1.0)
-        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, playerPed, 0)
+        local pCoords = GetEntityCoords(PlayerPedId())
+        local pForward = GetEntityForwardVector(PlayerPedId())
+        local start, target = pCoords + vec3(0, 0, 1.0), pCoords + (pForward * 2.2) + vec3(0, 0, 1.0)
+        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, PlayerPedId(), 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
         if hit == 1 and LocalTrees[entityHit] then
