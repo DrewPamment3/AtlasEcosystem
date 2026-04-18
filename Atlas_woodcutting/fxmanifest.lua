@@ -23,5 +23,5 @@ dependencies {
     'vorp_core',
     'vorp_inventory',
     'oxmysql',
-    'Atlas_Skilling' -- Essential: Allows use of AddSkillXP and GetSkillLevel
+    'Atlas_skilling' -- Essential: Allows use of AddSkillXP and GetSkillLevel
 }
