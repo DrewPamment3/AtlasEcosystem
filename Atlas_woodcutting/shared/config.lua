@@ -1,6 +1,8 @@
 Config = {}
 
--- Wood Definition
+Config.MinChopTime = 5000 -- 5 Seconds
+
+-- Loot Scaling
 Config.WoodTiers = {
     { id = 1, name = "crude_wood",     minLevel = 1,  baseWeight = 100, weightMultiplier = 1.0 },
     { id = 2, name = "fine_wood",      minLevel = 1,  baseWeight = 5,   weightMultiplier = 1.5 },
@@ -9,7 +11,14 @@ Config.WoodTiers = {
     { id = 5, name = "legendary_wood", minLevel = 70, baseWeight = 0.5, weightMultiplier = 5.0, reqAxeTier = 4 }
 }
 
--- Axe Definition
+-- Zone-based multipliers (Higher tier = more rare wood weight)
+Config.TierMultipliers = {
+    [1] = 1.0, -- Normal
+    [2] = 1.5, -- Better
+    [3] = 2.5, -- Rare
+    [4] = 5.0  -- Legendary
+}
+
 Config.Axes = {
     ["crude_axe"]     = { tier = 1, power = 1.0 },
     ["fine_axe"]      = { tier = 2, power = 1.2 },
@@ -18,30 +27,17 @@ Config.Axes = {
     ["legendary_axe"] = { tier = 5, power = 3.0 }
 }
 
--- Tree Hashes (What objects can be chopped)
-Config.Trees = {
-    [1035651700] = { name = "Pine", xp = 25 },
-    [1998592543] = { name = "Oak", xp = 40 },
-    [0] = { name = 'Discovered Tree', xp = 25 }
-    -- Add more as needed
-}
-
-
-Config = {}
-
--- Add this block specifically
+-- Fallback detection for random world trees (Material only)
 Config.TreeMaterials = {
     [1184711311] = true, -- WOOD_SOLID
-    [7587075] = true,    -- Wood/Bark found in trace
-    [10008579] = true,   -- Another wood material found
+    [7587075] = true,
+    [10008579] = true,
     [1697541] = true,
 }
 
-Config.RestrictedZones = {
-    { coords = vec3(921.70, -708.30, 69.17), radius = 10.0, name = 'New Restricted Zone' },
-    -- Add more lines here as you find them
+-- Static models you trust (Pine/Oak)
+Config.Trees = {
+    [1035651700] = { name = "Pine", xp = 25 },
+    [1998592543] = { name = "Oak", xp = 40 },
+    [1771086077] = { name = "Large Pine", xp = 30 },
 }
-
-Config.MinChopTime = 5000
-
--- Ensure other configs (AxeTiers, WoodTiers) follow...

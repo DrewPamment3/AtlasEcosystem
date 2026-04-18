@@ -8,64 +8,63 @@ local function DrawTxt(text, x, y)
     DisplayText(str, x, y)
 end
 
-local function GetTreeMaterialInFront()
-    local playerPed = PlayerPedId()
-    local pCoords = GetEntityCoords(playerPed)
-    local pForward = GetEntityForwardVector(playerPed)
+-- [[ NODE GENERATION ]]
+
+RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
+AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count)
+    local model = -1622460480 -- Default Oak
+    for i = 1, count do
+        local angle = math.random() * 2 * math.pi
+        local r = radius * math.sqrt(math.random())
+        local x = center.x + r * math.cos(angle)
+        local y = center.y + r * math.sin(angle)
+
+        -- Snap to ground
+        local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
+        if foundGround then
+            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', forestId, vec3(x, y, groundZ), model)
+        end
+        Citizen.Wait(100)
+    end
+end)
+
+-- [[ INTERACTION ]]
+
+local function GetTreeInFront()
+    local pCoords = GetEntityCoords(PlayerPedId())
+    local pForward = GetEntityForwardVector(PlayerPedId())
     local start = pCoords - (pForward * 0.5) + vec3(0, 0, 0.6)
     local target = pCoords + (pForward * 2.2) + vec3(0, 0, 0.6)
 
     DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255)
 
-    local rayHandle = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 273, playerPed, 0)
-    local _, hit, hitCoords, _, entityHit, materialHash = GetShapeTestResultIncludingMaterial(rayHandle)
+    local rayHandle = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 273, PlayerPedId(), 0)
+    local _, hit, _, _, entityHit, material = GetShapeTestResultIncludingMaterial(rayHandle)
 
-    return hit, entityHit, materialHash, hitCoords
-end
-
--- Command to "Discover" a tree and get its config line
-RegisterCommand('atree', function()
-    local hit, entity, material, coords = GetTreeMaterialInFront()
     if hit == 1 then
-        local model = (entity ~= 0) and GetEntityModel(entity) or 0
-        print("^2[Atlas Discovery]^7 Copy this to Config.Trees:")
-        print(string.format("[%s] = { name = 'Discovered Tree', xp = 25 },", model))
-        print("^2[Atlas Discovery]^7 Copy this to Config.TreeMaterials:")
-        print(string.format("[%s] = true,", material))
-    else
-        print("^1[Atlas Discovery]^7 No tree detected.")
+        return true, entityHit, material
     end
-end)
-
--- Command to create a restricted zone at your feet
-RegisterCommand('azone', function(source, args)
-    local radius = tonumber(args[1]) or 50.0
-    local coords = GetEntityCoords(PlayerPedId())
-    print("^3[Atlas Discovery]^7 Copy this to Config.RestrictedZones:")
-    print(string.format("{ coords = vec3(%.2f, %.2f, %.2f), radius = %.1f, name = 'New Restricted Zone' },", coords.x,
-        coords.y, coords.z, radius))
-end)
+    return false, 0, 0
+end
 
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        local hit, entity, material, coords = GetTreeMaterialInFront()
+        local hit, entity, material = GetTreeInFront()
 
-        if hit == 1 then
+        if hit then
             local model = (entity ~= 0) and GetEntityModel(entity) or 0
-            local isWood = Config.TreeMaterials and Config.TreeMaterials[material] ~= nil
-            local isKnownModel = Config.Trees and Config.Trees[model] ~= nil
+            local isWood = Config.TreeMaterials[material] ~= nil
+            local isKnown = Config.Trees[model] ~= nil or entity ~= 0 -- All spawned nodes have an Entity ID
 
-            DrawTxt("Material: " .. material .. " | Model: " .. model, 0.5, 0.88)
-            DrawTxt("Harvestable: " .. ((isWood or isKnownModel) and "YES (G)" or "NO"), 0.5, 0.91)
+            DrawTxt("Tree Detected | Entity: " .. entity, 0.5, 0.88)
 
-            if IsControlJustReleased(0, 0x760A9C6F) and not isBusy then
-                if isWood or isKnownModel then
-                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', coords)
+            if (isWood or isKnown) and not isBusy then
+                DrawTxt("Press [G] to Chop", 0.5, 0.91)
+                if IsControlJustReleased(0, 0x760A9C6F) then
+                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entity), entity)
                 end
             end
-        else
-            DrawTxt("Searching for tree...", 0.5, 0.88)
         end
     end
 end)
