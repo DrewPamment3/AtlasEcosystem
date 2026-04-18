@@ -135,3 +135,28 @@ RegisterCommand('testspawn', function(source, args)
         print("^1[Atlas]^7 FAILED: Engine still refuses to load " .. modelName)
     end
 end)
+
+RegisterCommand('sniff', function()
+    local playerPed = PlayerPedId()
+    local pCoords = GetEntityCoords(playerPed)
+    local pForward = GetEntityForwardVector(playerPed)
+
+    local start = pCoords + vec3(0, 0, 1.0)
+    local target = pCoords + (pForward * 5.0) + vec3(0, 0, 1.0)
+
+    -- Raycast against everything (map, props, peds)
+    local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, -1, playerPed, 0)
+    local _, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(ray)
+
+    if hit == 1 and entityHit ~= 0 then
+        local modelHash = GetEntityModel(entityHit)
+        print("^3[Atlas Sniffer]^7 Hit Entity: " .. entityHit)
+        print("^3[Atlas Sniffer]^7 Model Hash (Decimal): " .. modelHash)
+        print("^3[Atlas Sniffer]^7 Model Hash (Hex): " .. string.format("0x%X", modelHash))
+
+        -- Note: Many world trees won't return a string name, only the hash.
+        -- Use the Decimal hash in your /createforest command if the name is unknown.
+    else
+        print("^1[Atlas Sniffer]^7 Raycast hit nothing. Get closer to the tree.")
+    end
+end)
