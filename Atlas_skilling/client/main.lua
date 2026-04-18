@@ -64,8 +64,7 @@ end)
 RegisterNetEvent('atlas_skilling:xpNotification')
 AddEventHandler('atlas_skilling:xpNotification', function(skill, amount, totalXP)
     local skillLabel = skill:gsub("^%l", string.upper)
-    VORPcore.NotifyTop("~t6~" .. skillLabel .. " XP", "Gained ~t2~+" .. amount .. " ~q~XP (Total: " .. totalXP .. ")",
-        4000)
+    VORPcore.NotifyTop("~t6~" .. skillLabel .. " XP", "Gained ~t2~+" .. amount .. " ~q~XP (Total: " .. totalXP .. ")", 4000)
     PlaySoundFrontend("SELECT", "HUD_SHOP_SOUNDSET", true, 0)
 end)
 
