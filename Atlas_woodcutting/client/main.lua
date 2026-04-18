@@ -11,20 +11,26 @@ end
 -- [[ NODE GENERATION ]]
 
 RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
-AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count)
-    local model = -1622460480 -- Default Oak
+AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count, modelName)
+    print("^3[Atlas Client]^7 Probing terrain for " .. count .. " trees...")
+
     for i = 1, count do
         local angle = math.random() * 2 * math.pi
         local r = radius * math.sqrt(math.random())
         local x = center.x + r * math.cos(angle)
         local y = center.y + r * math.sin(angle)
 
-        -- Snap to ground
+        -- Find the dirt
         local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
+
         if foundGround then
-            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', forestId, vec3(x, y, groundZ), model)
+            print("^2[Atlas Client]^7 Found ground at " .. groundZ .. ". Sending to server...")
+            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', forestId, vec3(x, y, groundZ), modelName)
+        else
+            print("^1[Atlas Client]^7 Ground not loaded at this X/Y. Skipping node.")
         end
-        Citizen.Wait(100)
+
+        Citizen.Wait(500) -- Give plenty of time for server to process each spawn
     end
 end)
 
