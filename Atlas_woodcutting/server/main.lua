@@ -1,10 +1,12 @@
 local VORPcore = exports.vorp_core:GetCore()
 local ActiveTasks = {}
 local GlobalNodes = {}
+local RestrictedZones = {}
 
 -- [[ INITIALIZATION ]]
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
+    -- Load Nodes
     exports.oxmysql:execute('SELECT x, y, z, model_name FROM atlas_woodcutting_nodes', {}, function(nodes)
         if nodes then
             GlobalNodes = nodes
@@ -16,7 +18,6 @@ end)
 RegisterServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 AddEventHandler('Atlas_Woodcutting:Server:PlayerLoaded', function()
     local _source = source
-    print("^3[Atlas]^7 Syncing " .. #GlobalNodes .. " nodes to Player " .. _source)
     TriggerClientEvent('Atlas_Woodcutting:Client:SyncNodes', _source, GlobalNodes)
 end)
 
@@ -33,19 +34,26 @@ AddEventHandler('Atlas_Woodcutting:Server:SaveNode', function(forestId, coords, 
         end)
 end)
 
--- [[ ADMIN ]]
+-- [[ ADMIN COMMAND ]]
 RegisterCommand('createforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.getGroup ~= 'admin' then return end
 
     local pCoords = GetEntityCoords(GetPlayerPed(_source))
-    local radius, count = tonumber(args[1]) or 15.0, tonumber(args[2]) or 10
-    local model = args[3] or "p_pine_01" -- Using a verified RDR3 name
 
+    -- Corrected Argument Indexing
+    local radius  = tonumber(args[1]) or 15.0
+    local count   = tonumber(args[2]) or 10
+    local tier    = tonumber(args[3]) or 1
+    local model   = args[4] or "p_pine_01" -- Now correctly looks at index 4
+
+    print("^3[Atlas]^7 Creating Forest: " .. model .. " (Tier: " .. tier .. ")")
+
+    -- Ensure SQL matches your columns: x, y, z, radius, tree_count, tier, model_name
     exports.oxmysql:insert(
-        'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, model_name) VALUES (?, ?, ?, ?, ?, ?)',
-        { pCoords.x, pCoords.y, pCoords.z, radius, count, model }, function(fId)
+        'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, tier, model_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, model }, function(fId)
             if fId then
                 TriggerClientEvent('Atlas_Woodcutting:Client:GenerateForestNodes', _source, fId, pCoords, radius, count,
                     model)
@@ -67,6 +75,7 @@ AddEventHandler('Atlas_Woodcutting:Server:FinishChop', function(token)
     local _source = source
     local task = ActiveTasks[_source]
     if not task or task.token ~= token then return end
+
     exports.Atlas_Skilling:AddSkillXP(_source, 'woodcutting', 20)
     ActiveTasks[_source] = nil
 end)
