@@ -16,7 +16,6 @@ client_scripts {
 }
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua', -- ADD THIS LINE
     'server/main.lua'
 }
 
@@ -24,5 +23,5 @@ dependencies {
     'vorp_core',
     'vorp_inventory',
     'oxmysql',
-    'Atlas_skilling'
+    'Atlas_skilling' -- Essential: Allows use of AddSkillXP and GetSkillLevel
 }
