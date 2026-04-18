@@ -22,6 +22,7 @@ Config.Axes = {
 Config.Trees = {
     [1035651700] = { name = "Pine", xp = 25 },
     [1998592543] = { name = "Oak", xp = 40 },
+    [0] = { name = 'Discovered Tree', xp = 25 }
     -- Add more as needed
 }
 
@@ -34,6 +35,7 @@ Config.TreeMaterials = {
     [1184711311] = true, -- WOOD_SOLID
     [7587075] = true,    -- Wood/Bark found in trace
     [10008579] = true,   -- Another wood material found
+    [1697541] = true,
 }
 
 -- Keep your existing tree list for specific entity detection
