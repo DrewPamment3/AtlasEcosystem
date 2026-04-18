@@ -80,33 +80,42 @@ end
 -- Example: /givexp 1 woodcutting 500
 RegisterCommand('givexp', function(source, args)
     local _source = source
-    local User = VORPcore.getUser(_source)
-    local group = User.group -- Get player group (admin, superadmin, etc)
+    local canExecute = false
 
-    -- 1. Permission Check
-    if group == 'admin' or group == 'superadmin' then
+    -- 1. Console (source 0) always has permission
+    if _source == 0 then
+        canExecute = true
+    else
+        local User = VORPcore.getUser(_source)
+        if User and (User.group == 'admin' or User.group == 'superadmin') then
+            canExecute = true
+        end
+    end
+
+    -- 2. Execute if permitted
+    if canExecute then
         local targetID = tonumber(args[1])
-        local skillName = tostring(args[2]):lower()
+        local skillName = args[2] and tostring(args[2]):lower() or nil
         local amount = tonumber(args[3])
 
-        -- 2. Validation
         if targetID and skillName and amount then
+            -- Verify target exists
             local Target = VORPcore.getUser(targetID)
-
             if Target then
-                -- 3. Execute XP Gain
-                -- We call our own export internally
                 exports.atlas_skilling:AddSkillXP(targetID, skillName, amount)
 
+                if _source ~= 0 then
+                    VORPcore.NotifyRightTip(_source, "Granted " .. amount .. " XP to ID " .. targetID, 4000)
+                end
                 print('^2[Atlas Admin]^7 Granted ' .. amount .. ' XP in ' .. skillName .. ' to ID: ' .. targetID)
-                VORPcore.NotifyRightTip(_source, "Granted " .. amount .. " XP to ID " .. targetID, 4000)
             else
-                VORPcore.NotifyRightTip(_source, "Player ID not found.", 4000)
+                print('^1[Atlas Admin Error]^7 Target ID ' .. targetID .. ' not found.')
             end
         else
-            VORPcore.NotifyRightTip(_source, "Usage: /givexp [id] [skill] [amount]", 4000)
+            print('^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]')
         end
     else
         VORPcore.NotifyRightTip(_source, "You do not have permission to use this.", 4000)
+        VORPcore.NotifyRightTip(_source, User.group tostring(), 4000)
     end
 end, false)
