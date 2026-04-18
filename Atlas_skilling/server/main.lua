@@ -1,6 +1,6 @@
 local VORPcore = exports.vorp_core:GetCore()
 
--- 1. INITIALIZATION: Create the row when a character is selected
+-- 1. INITIALIZATION
 RegisterNetEvent('vorp:SelectedCharacter')
 AddEventHandler('vorp:SelectedCharacter', function(source, character)
     local charidentifier = character.charIdentifier
@@ -14,83 +14,76 @@ AddEventHandler('vorp:SelectedCharacter', function(source, character)
         end)
 end)
 
--- Callback for grabbing skill information from client
 RegisterServerEvent('atlas_skilling:getSkills')
 AddEventHandler('atlas_skilling:getSkills', function()
     local _source = source
-    local Character = VORPcore.getUser(_source).getUsedCharacter
+    local User = VORPcore.getUser(_source)
+    if not User then return end
+
+    local Character = User.getUsedCharacter
+    if not Character then return end
+
     local charidentifier = Character.charIdentifier
 
     exports.oxmysql:execute('SELECT * FROM character_skills WHERE charidentifier = ?', { charidentifier },
         function(result)
             if result and result[1] then
-                local skillData = result[1]
-                TriggerClientEvent('atlas_skilling:openMenu', _source, skillData)
+                TriggerClientEvent('atlas_skilling:openMenu', _source, result[1])
             end
         end)
 end)
 
 -- 2. THE XP MANAGER LOGIC
--- Internal function so the script can call itself without using exports
 local function AddSkillXP_Internal(source, skill, amount, personalMult)
-    local Character = VORPcore.getUser(source).getUsedCharacter
+    local User = VORPcore.getUser(source)
+    if not User then return end
+
+    local Character = User.getUsedCharacter
     if not Character then return end
 
     local charidentifier = Character.charIdentifier
     local skillColumn = string.lower(skill) .. "_xp"
     local pMult = personalMult or 1.0
-
-    -- Using Config from shared/config.lua
     local finalAmount = math.floor(amount * Config.GlobalXPMultiplier * pMult)
 
     exports.oxmysql:scalar('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?',
         { charidentifier }, function(currentXP)
             if currentXP ~= nil then
                 local newXP = currentXP + finalAmount
-
                 if newXP > Config.MaxXP then newXP = Config.MaxXP end
 
                 exports.oxmysql:execute('UPDATE character_skills SET ' .. skillColumn .. ' = ? WHERE charidentifier = ?',
                     { newXP, charidentifier })
 
                 TriggerClientEvent('atlas_skilling:xpNotification', source, skill, finalAmount, newXP)
-                CheckForLevelUp(source, currentXP, newXP)
+
+                -- Level Logic
+                local oldLevel = math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
+                local newLevel = math.floor(math.sqrt(newXP / Config.XPFormulaDivisor)) + 1
+
+                if newLevel > oldLevel then
+                    TriggerClientEvent('atlas_skilling:levelUp', source, newLevel)
+                    print("^3[Atlas Skilling]^7 Player " .. source .. " leveled up to " .. newLevel)
+                end
             end
         end)
 end
 
--- Register the internal function as an export for OTHER resources
 exports('AddSkillXP', AddSkillXP_Internal)
 
--- 3. LEVEL LOGIC
-function GetLevelFromXP(xp)
-    return math.floor(math.sqrt(xp / Config.XPFormulaDivisor)) + 1
-end
-
-function CheckForLevelUp(source, oldXP, newXP)
-    local oldLevel = GetLevelFromXP(oldXP)
-    local newLevel = GetLevelFromXP(newXP)
-
-    if newLevel > oldLevel then
-        TriggerClientEvent('atlas_skilling:levelUp', source, newLevel)
-        print("^3[Atlas Skilling]^7 Player " .. source .. " has leveled up to " .. newLevel)
-    end
-end
-
--- 4. ADMIN COMMAND: Grant XP
--- Usage: /givexp [ID] [SKILL] [AMOUNT]
+-- 3. ADMIN COMMAND
 RegisterCommand('givexp', function(source, args)
     local _source = source
     local canExecute = false
     local userGroup = "none"
 
-    -- 1. Console (source 0) or Admin/Superadmin groups
     if _source == 0 then
         canExecute = true
+        userGroup = "console"
     else
         local User = VORPcore.getUser(_source)
         if User then
-            userGroup = User.group or "user" -- Fallback to 'user' string if nil
+            userGroup = User.group or "user"
             if userGroup == 'admin' or userGroup == 'superadmin' then
                 canExecute = true
             end
@@ -107,28 +100,20 @@ RegisterCommand('givexp', function(source, args)
         if targetID and skillName and amount then
             local Target = VORPcore.getUser(targetID)
             if Target and Target.getUsedCharacter then
-                -- Direct call to the internal function
                 AddSkillXP_Internal(targetID, skillName, amount)
-
                 if _source ~= 0 then
                     VORPcore.NotifyRightTip(_source, "Granted " .. amount .. " XP to ID " .. targetID, 4000)
                 end
                 print('^2[Atlas Admin]^7 Granted ' .. amount .. ' XP in ' .. skillName .. ' to ID: ' .. targetID)
             else
-                local errorMsg = "^1[Atlas Admin Error]^7 Target ID " ..
-                    targetID .. " not found or character not loaded."
-                if _source ~= 0 then VORPcore.NotifyRightTip(_source, "Target not found.", 4000) end
-                print(errorMsg)
+                print('^1[Atlas Admin Error]^7 Target ID ' .. targetID .. ' not found.')
             end
         else
-            local usageMsg = "^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]"
-            if _source ~= 0 then VORPcore.NotifyRightTip(_source, "Invalid Arguments.", 4000) end
-            print(usageMsg)
+            print('^1[Atlas Admin Error]^7 Usage: /givexp [id] [skill] [amount]')
         end
     else
-        -- VERBOSE DEBUGGING
-        local denyMsg = "Access Denied. Your group is [" .. userGroup .. "]. Required: [admin] or [superadmin]."
-        VORPcore.NotifyRightTip(_source, denyMsg, 6000)
-        print("^1[Atlas Admin Auth]^7 " .. denyMsg .. " (Source: " .. _source .. ")")
+        local denyMsg = "Access Denied. Your group is [" .. userGroup .. "]. Required: admin."
+        if _source ~= 0 then VORPcore.NotifyRightTip(_source, denyMsg, 6000) end
+        print("^1[Atlas Admin Auth]^7 " .. denyMsg)
     end
 end, false)
