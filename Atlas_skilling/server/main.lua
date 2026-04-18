@@ -115,3 +115,26 @@ RegisterCommand('givexp', function(source, args)
         print("^1[Atlas Admin Auth]^7 " .. denyMsg)
     end
 end, false)
+
+-- Returns the player's level for a specific skill
+-- Calculation: floor(sqrt(currentXP / Divisor)) + 1
+function GetSkillLevel(source, skill)
+    local User = VORPcore.getUser(source)
+    if not User then return 1 end
+
+    local Character = User.getUsedCharacter
+    if not Character then return 1 end
+
+    local charidentifier = Character.charIdentifier
+    local skillColumn = string.lower(skill) .. "_xp"
+
+    -- Using await for a synchronous return to the calling script
+    local currentXP = exports.oxmysql:scalar_await(
+        'SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', { charidentifier })
+
+    if currentXP then
+        return math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
+    end
+
+    return 1
+end

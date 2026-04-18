@@ -18,6 +18,9 @@ dependencies {
     'oxmysql'
 }
 
-server_export 'AddSkillXP'
+exports {
+    'AddSkillXP',
+    'GetSkillLevel'
+}
 
 version '1.0'
