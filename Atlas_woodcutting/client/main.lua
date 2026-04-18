@@ -33,7 +33,7 @@ Citizen.CreateThread(function()
             local entity, coords, model = GetTreeInFront()
 
             -- Debug: Uncomment the line below to see hashes of objects you look at in F8
-            -- if entity then print("Hit Model Hash: " .. model) end
+            if entity then print("Hit Model Hash: " .. model) end
 
             if entity and Config.Trees[model] then
                 -- Trigger server to check inventory and start session
