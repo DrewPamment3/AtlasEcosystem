@@ -1,100 +1,115 @@
-local VORPcore = exports.vorp_core:GetCore()
-local ActiveTasks = {}
-local GlobalNodes = {}
+local isBusy = false
+local LocalTrees = {} -- [entityHandle] = forestId
 
--- [[ INITIALIZATION ]]
+local function DrawTxt(text, x, y)
+    SetTextScale(0.35, 0.35)
+    SetTextColor(255, 255, 255, 255)
+    SetTextCentre(true)
+    local str = CreateVarString(10, "LITERAL_STRING", text)
+    DisplayText(str, x, y)
+end
+
+-- [[ SPAWNING LOGIC ]]
+
+local function SpawnLocalTree(node)
+    local modelHash = GetHashKey(node.model_name)
+
+    if not HasModelLoaded(modelHash) then
+        RequestModel(modelHash)
+        while not HasModelLoaded(modelHash) do Citizen.Wait(1) end
+    end
+
+    local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
+
+    -- Burial: Sinks roots by 0.2m to prevent hover
+    local buriedZ = groundZ - 0.2
+
+    local tree = CreateObject(modelHash, node.x, node.y, buriedZ, false, false, false)
+
+    -- Vertical Growth + Random Yaw
+    local randomYaw = math.random(0, 360) + 0.0
+    SetEntityRotation(tree, 0.0, 0.0, randomYaw, 2, true)
+
+    FreezeEntityPosition(tree, true)
+    SetEntityAsMissionEntity(tree, true, true)
+    LocalTrees[tree] = node.forest_id
+    SetModelAsNoLongerNeeded(modelHash)
+end
+
+-- [[ SYNC & CLEANUP ]]
+
+-- Use RegisterNetEvent on the client
+RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
+AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
+    for entity, _ in pairs(LocalTrees) do
+        if DoesEntityExist(entity) then DeleteEntity(entity) end
+    end
+    LocalTrees = {}
+    for _, node in ipairs(nodes) do SpawnLocalTree(node) end
+end)
+
+RegisterNetEvent('Atlas_Woodcutting:Client:SpawnSingleNode')
+AddEventHandler('Atlas_Woodcutting:Client:SpawnSingleNode', function(node)
+    SpawnLocalTree(node)
+end)
+
+RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
+AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
+    for entity, fId in pairs(LocalTrees) do
+        if fId == forestId then
+            if DoesEntityExist(entity) then DeleteEntity(entity) end
+            LocalTrees[entity] = nil
+        end
+    end
+end)
+
 Citizen.CreateThread(function()
-    Citizen.Wait(1000)
-    -- Database queries ONLY happen on the server
-    exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
-        if nodes then
-            GlobalNodes = nodes
-            print("^2[Atlas]^7 Server loaded " .. #nodes .. " nodes from DB.")
+    Citizen.Wait(5000)
+    TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
+end)
+
+-- [[ GENERATION ]]
+
+RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
+AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count, modelName)
+    for i = 1, count do
+        local angle, r = math.random() * 2 * math.pi, radius * math.sqrt(math.random())
+        local x, y = center.x + r * math.cos(angle), center.y + r * math.sin(angle)
+        local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
+
+        if foundGround then
+            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', forestId, vec3(x, y, groundZ), modelName)
         end
-    end)
+        Citizen.Wait(300)
+    end
 end)
 
--- RegisterServerEvent is ONLY for server/main.lua
-RegisterServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
-AddEventHandler('Atlas_Woodcutting:Server:PlayerLoaded', function()
-    local _source = source
-    TriggerClientEvent('Atlas_Woodcutting:Client:SyncNodes', _source, GlobalNodes)
-end)
+-- [[ INTERACTION ]]
 
-RegisterServerEvent('Atlas_Woodcutting:Server:SaveNode')
-AddEventHandler('Atlas_Woodcutting:Server:SaveNode', function(forestId, coords, modelName)
-    exports.oxmysql:insert('INSERT INTO atlas_woodcutting_nodes (forest_id, x, y, z, model_name) VALUES (?, ?, ?, ?, ?)',
-        { forestId, coords.x, coords.y, coords.z, modelName }, function(id)
-            if id then
-                local node = { x = coords.x, y = coords.y, z = coords.z, model_name = modelName, forest_id = forestId }
-                table.insert(GlobalNodes, node)
-                TriggerClientEvent('Atlas_Woodcutting:Client:SpawnSingleNode', -1, node)
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        local pCoords = GetEntityCoords(PlayerPedId())
+        local pForward = GetEntityForwardVector(PlayerPedId())
+        local start, target = pCoords + vec3(0, 0, 1.0), pCoords + (pForward * 2.2) + vec3(0, 0, 1.0)
+        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, PlayerPedId(), 0)
+        local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
+
+        if hit == 1 and LocalTrees[entityHit] then
+            DrawTxt("Harvest Tree [G]", 0.5, 0.88)
+            if IsControlJustReleased(0, 0x760A9C6F) and not isBusy then
+                TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
             end
-        end)
-end)
-
--- [[ ADMIN COMMANDS ]]
-
-RegisterCommand('createforest', function(source, args)
-    local _source = source
-    local user = VORPcore.getUser(_source)
-    if not user or user.getGroup ~= 'admin' then return end
-
-    local pCoords = GetEntityCoords(GetPlayerPed(_source))
-    local radius  = tonumber(args[1]) or 15.0
-    local count   = tonumber(args[2]) or 10
-    local tier    = tonumber(args[3]) or 1
-    local model   = args[4] or "p_tree_pine01x"
-    local name    = args[5] or "Unnamed_Grove"
-
-    exports.oxmysql:insert(
-        'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, tier, model_name, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, model, name }, function(fId)
-            if fId then
-                print("^2[Atlas]^7 Forest Created: " .. name .. " (ID: " .. fId .. ")")
-                TriggerClientEvent('Atlas_Woodcutting:Client:GenerateForestNodes', _source, fId, pCoords, radius, count,
-                    model)
-            end
-        end)
-end)
-
-RegisterCommand('wipeforest', function(source, args)
-    local _source = source
-    local user = VORPcore.getUser(_source)
-    if not user or user.getGroup ~= 'admin' then return end
-
-    local targetName = args[1]
-    if not targetName then return end
-
-    exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE name = ?', { targetName }, function(result)
-        if result and result[1] then
-            local fId = result[1].id
-            exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
-            exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
-
-            for i = #GlobalNodes, 1, -1 do
-                if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
-            end
-
-            TriggerClientEvent('Atlas_Woodcutting:Client:WipeSpecificForest', -1, fId)
         end
-    end)
+    end
 end)
 
--- [[ HARVESTING ]]
-RegisterServerEvent('Atlas_Woodcutting:Server:RequestStart')
-AddEventHandler('Atlas_Woodcutting:Server:RequestStart', function(coords)
-    local _source = source
-    local token = "CHOP_" .. math.random(1000, 9999)
-    ActiveTasks[_source] = { token = token, startTime = os.time() }
-    TriggerClientEvent('Atlas_Woodcutting:Client:BeginMinigame', _source, token)
-end)
-
-RegisterServerEvent('Atlas_Woodcutting:Server:FinishChop')
-AddEventHandler('Atlas_Woodcutting:Server:FinishChop', function(token)
-    local _source = source
-    local task = ActiveTasks[_source]
-    if not task or task.token ~= token then return end
-    exports.Atlas_Skilling:AddSkillXP(_source, 'woodcutting', 20)
-    ActiveTasks[_source] = nil
+RegisterNetEvent('Atlas_Woodcutting:Client:BeginMinigame')
+AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
+    isBusy = true
+    TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
+    Citizen.Wait(5000)
+    ClearPedTasks(PlayerPedId())
+    isBusy = false
+    TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token)
 end)
