@@ -1,13 +1,11 @@
 local isBusy = false
-local debugMode = true -- ALWAYS ON UNTIL FURTHER NOTICE
+local debugMode = true
 
 -- [[ UI DRAWING ]]
-
 local function DrawWoodcuttingPrompt()
     local x, y = 0.5, 0.92
     DrawRect(x, y, 0.12, 0.045, 0, 0, 0, 180)
 
-    -- "G" Button
     SetTextScale(0.38, 0.38)
     SetTextColor(0, 0, 0, 255)
     SetTextCentre(true)
@@ -15,7 +13,6 @@ local function DrawWoodcuttingPrompt()
     DrawRect(x - 0.035, y, 0.022, 0.032, 255, 255, 255, 255)
     DisplayText(gText, x - 0.035, y - 0.016)
 
-    -- Label
     SetTextScale(0.35, 0.35)
     SetTextColor(255, 255, 255, 255)
     SetTextCentre(false)
@@ -25,7 +22,6 @@ local function DrawWoodcuttingPrompt()
 end
 
 -- [[ SPAWNING & TAGGING ]]
-
 local function SpawnLocalTree(node)
     local modelHash = GetHashKey(node.model_name)
     if not HasModelLoaded(modelHash) then
@@ -40,59 +36,56 @@ local function SpawnLocalTree(node)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
 
-    -- STATE BAG Persistent Stamp
+    -- STATE BAG: Ensure the key is exactly 'atlas_grove'
     Entity(tree).state:set('atlas_grove', node.forest_id, true)
 
-    if debugMode then print("^3[Atlas Debug]^7 Spawning Tagged Tree: " ..
-        node.model_name .. " | ForestID: " .. node.forest_id) end
+    if debugMode then print("^3[Atlas]^7 Spawned and Tagged: " .. node.model_name .. " (Entity: " .. tree .. ")") end
     SetModelAsNoLongerNeeded(modelHash)
 end
 
 -- [[ INTERACTION LOOP ]]
-
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
         local playerPed = PlayerPedId()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
-        local start = pCoords + vec3(0, 0, 1.2)
-        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 1.2)
 
-        -- VISUAL RAYCAST
+        -- Shooting slightly further (3.0m) to ensure collision
+        local start = pCoords + vec3(0, 0, 1.2)
+        local target = pCoords + (pForward * 3.0) + vec3(0, 0, 1.2)
+
         if debugMode then DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255) end
 
-        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, playerPed, 0)
+        -- MASK 255: Detect everything (World, Props, Peds)
+        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 255, playerPed, 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
-        if hit == 1 and entityHit ~= 0 then
-            local forestId = Entity(entityHit).state.atlas_grove
+        -- 1. BUTTON CHECK (Moved outside entity check)
+        if IsControlJustPressed(0, 0x760A9C6F) then
+            print("^3[Atlas Debug]^7 G Pressed. Raycast Hit: " .. hit .. " | Entity: " .. (entityHit or "None"))
 
-            -- IF TAGGED: Draw UI
-            if forestId then
-                DrawWoodcuttingPrompt()
-            end
-
-            -- DEBUG G-PRESS LOGIC
-            if IsControlJustReleased(0, 0x760A9C6F) and debugMode then
+            if hit == 1 and entityHit ~= 0 then
+                local forestId = Entity(entityHit).state.atlas_grove
                 local model = GetEntityModel(entityHit)
-                print("^3[Atlas Debug Interaction]^7 Pressed G on Entity: " .. entityHit .. " | Model: " .. model)
+                print("^3[Atlas Debug]^7 Model Hash: " .. model .. " | Tagged ID: " .. (forestId or "NULL"))
 
-                if forestId then
-                    print("^2[Atlas Debug Interaction]^7 SUCCESS: Entity HAS tag 'atlas_grove' with value: " .. forestId)
-                    if not isBusy then
-                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
-                    end
-                else
-                    print("^1[Atlas Debug Interaction]^7 FAILED: Entity does NOT have 'atlas_grove' tag.")
+                if forestId and not isBusy then
+                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
                 end
+            end
+        end
+
+        -- 2. UI DRAWING (Visual confirmation)
+        if hit == 1 and entityHit ~= 0 then
+            if Entity(entityHit).state.atlas_grove then
+                DrawWoodcuttingPrompt()
             end
         end
     end
 end)
 
--- [[ SYNC & CLEANUP ]]
-
+-- [[ EVENTS & SYNC ]]
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
 AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
     local objects = GetGamePool('CObject')
@@ -121,8 +114,6 @@ Citizen.CreateThread(function()
     TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 end)
 
--- [[ GENERATION ]]
-
 RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, center, radius, count, model)
     for i = 1, count do
@@ -134,8 +125,6 @@ AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, ce
         Citizen.Wait(300)
     end
 end)
-
--- [[ ANIMATION ]]
 
 RegisterNetEvent('Atlas_Woodcutting:Client:BeginMinigame')
 AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
