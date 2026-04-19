@@ -5,6 +5,7 @@ local GlobalNodes = {}
 -- [[ INITIALIZATION ]]
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
+    -- Database queries ONLY happen on the server
     exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
         if nodes then
             GlobalNodes = nodes
@@ -13,13 +14,13 @@ Citizen.CreateThread(function()
     end)
 end)
 
+-- RegisterServerEvent is ONLY for server/main.lua
 RegisterServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 AddEventHandler('Atlas_Woodcutting:Server:PlayerLoaded', function()
     local _source = source
     TriggerClientEvent('Atlas_Woodcutting:Client:SyncNodes', _source, GlobalNodes)
 end)
 
--- [[ SAVING ]]
 RegisterServerEvent('Atlas_Woodcutting:Server:SaveNode')
 AddEventHandler('Atlas_Woodcutting:Server:SaveNode', function(forestId, coords, modelName)
     exports.oxmysql:insert('INSERT INTO atlas_woodcutting_nodes (forest_id, x, y, z, model_name) VALUES (?, ?, ?, ?, ?)',
@@ -34,7 +35,6 @@ end)
 
 -- [[ ADMIN COMMANDS ]]
 
--- Usage: /createforest [radius] [count] [tier] [model] [name]
 RegisterCommand('createforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
@@ -58,7 +58,6 @@ RegisterCommand('createforest', function(source, args)
         end)
 end)
 
--- Usage: /wipeforest [name]
 RegisterCommand('wipeforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
@@ -70,21 +69,14 @@ RegisterCommand('wipeforest', function(source, args)
     exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE name = ?', { targetName }, function(result)
         if result and result[1] then
             local fId = result[1].id
-
-            -- DB Clear
             exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
             exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
 
-            -- Memory Clear
             for i = #GlobalNodes, 1, -1 do
-                if GlobalNodes[i].forest_id == fId then
-                    table.remove(GlobalNodes, i)
-                end
+                if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
             end
 
-            -- Client Sync
             TriggerClientEvent('Atlas_Woodcutting:Client:WipeSpecificForest', -1, fId)
-            print("^2[Atlas]^7 Forest '" .. targetName .. "' purged.")
         end
     end)
 end)
