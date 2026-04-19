@@ -2,6 +2,7 @@ local VORPcore = exports.vorp_core:GetCore()
 local ActiveTasks = {}
 local GlobalNodes = {}
 
+-- [[ INITIALIZATION ]]
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
     exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
@@ -29,13 +30,18 @@ AddEventHandler('Atlas_Woodcutting:Server:SaveNode', function(forestId, coords, 
         end)
 end)
 
+-- [[ ADMIN COMMANDS ]]
 RegisterCommand('createforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.getGroup ~= 'admin' then return end
+
     local pCoords = GetEntityCoords(GetPlayerPed(_source))
-    local radius, count, tier = tonumber(args[1]) or 15.0, tonumber(args[2]) or 10, tonumber(args[3]) or 1
-    local model, name = args[4] or "p_tree_pine01x", args[5] or "Unnamed_Grove"
+    local radius  = tonumber(args[1]) or 15.0
+    local count   = tonumber(args[2]) or 10
+    local tier    = tonumber(args[3]) or 1
+    local model   = args[4] or "p_tree_pine01x"
+    local name    = args[5] or "Unnamed_Grove"
 
     exports.oxmysql:insert(
         'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, tier, model_name, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -51,6 +57,7 @@ RegisterCommand('wipeforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.getGroup ~= 'admin' then return end
+
     local targetName = args[1]
     if not targetName then return end
 
@@ -59,14 +66,17 @@ RegisterCommand('wipeforest', function(source, args)
             local fId = result[1].id
             exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
             exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
+
             for i = #GlobalNodes, 1, -1 do
                 if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
             end
+
             TriggerClientEvent('Atlas_Woodcutting:Client:WipeSpecificForest', -1, fId)
         end
     end)
 end)
 
+-- [[ HARVESTING ]]
 RegisterServerEvent('Atlas_Woodcutting:Server:RequestStart')
 AddEventHandler('Atlas_Woodcutting:Server:RequestStart', function(coords)
     local _source = source

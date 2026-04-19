@@ -1,19 +1,13 @@
 local isBusy = false
 local debugMode = true
-
--- [[ DECORATOR REGISTRATION ]]
--- 3 = Integer. We register this so the engine knows 'atlas_grove' is a valid data field.
-Citizen.CreateThread(function()
-    if not DecorIsRegisteredAtAll("atlas_grove") then
-        DecorRegister("atlas_grove", 3)
-    end
-end)
+local GroveRegistry = {} -- Stores [coordKey] = {entity, forest_id}
 
 -- [[ UI DRAWING ]]
 local function DrawWoodcuttingPrompt()
     local x, y = 0.5, 0.92
     DrawRect(x, y, 0.12, 0.045, 0, 0, 0, 180)
 
+    -- "G" Button Look
     SetTextScale(0.38, 0.38)
     SetTextColor(0, 0, 0, 255)
     SetTextCentre(true)
@@ -21,6 +15,7 @@ local function DrawWoodcuttingPrompt()
     DrawRect(x - 0.035, y, 0.022, 0.032, 255, 255, 255, 255)
     DisplayText(gText, x - 0.035, y - 0.016)
 
+    -- The Prompt
     SetTextScale(0.35, 0.35)
     SetTextColor(255, 255, 255, 255)
     SetTextCentre(false)
@@ -29,7 +24,13 @@ local function DrawWoodcuttingPrompt()
     DisplayText(actionText, x - 0.018, y - 0.016)
 end
 
--- [[ SPAWNING & TAGGING ]]
+-- [[ COORD KEY HELPER ]]
+-- Rounds to 1 decimal place to avoid floating point jitter
+local function GetCoordKey(coords)
+    return string.format("%.1f_%.1f", coords.x, coords.y)
+end
+
+-- [[ SPAWNING ]]
 local function SpawnLocalTree(node)
     local modelHash = GetHashKey(node.model_name)
     if not HasModelLoaded(modelHash) then
@@ -44,10 +45,11 @@ local function SpawnLocalTree(node)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
 
-    -- DECORATOR SET: This is the hard-coded property you wanted
-    DecorSetInt(tree, "atlas_grove", node.forest_id)
+    -- Source of Truth: Mapping the coordinates to the Forest ID
+    local key = GetCoordKey(node)
+    GroveRegistry[key] = { entity = tree, forest_id = node.forest_id }
 
-    if debugMode then print("^3[Atlas]^7 Tagged Entity " .. tree .. " with Grove ID " .. node.forest_id) end
+    if debugMode then print("^3[Atlas]^7 Registered Tree at: " .. key) end
     SetModelAsNoLongerNeeded(modelHash)
 end
 
@@ -58,41 +60,31 @@ Citizen.CreateThread(function()
         local playerPed = PlayerPedId()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
-
         local start = pCoords + vec3(0, 0, 1.2)
-        local target = pCoords + (pForward * 3.0) + vec3(0, 0, 1.2)
+        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 1.2)
 
         if debugMode then DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255) end
 
-        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 255, playerPed, 0)
+        -- Detect objects (16) and map geometry (1) for broad coverage
+        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, playerPed, 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
-        -- 1. UI DRAWING
         if hit == 1 and entityHit ~= 0 then
-            -- DecorExist Check
-            if DecorExistOn(entityHit, "atlas_grove") then
+            local entCoords = GetEntityCoords(entityHit)
+            local key = GetCoordKey(entCoords)
+            local nodeData = GroveRegistry[key]
+
+            if nodeData then
                 DrawWoodcuttingPrompt()
-            end
-        end
 
-        -- 2. BUTTON LOGIC
-        if IsControlJustPressed(0, 0x760A9C6F) then
-            print("^3[Atlas Debug]^7 G Pressed. Hit: " .. hit .. " | Entity: " .. (entityHit or "0"))
-
-            if hit == 1 and entityHit ~= 0 then
-                local model = GetEntityModel(entityHit)
-                -- DecorGet Check
-                if DecorExistOn(entityHit, "atlas_grove") then
-                    local groveId = DecorGetInt(entityHit, "atlas_grove")
-                    print("^2[Atlas Debug]^7 SUCCESS: Entity has 'atlas_grove' tag. ID: " .. groveId)
-
+                if IsControlJustPressed(0, 0x760A9C6F) then
+                    print("^2[Atlas]^7 Interaction Match: Key " .. key .. " belongs to Forest " .. nodeData.forest_id)
                     if not isBusy then
-                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
+                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
                     end
-                else
-                    print("^1[Atlas Debug]^7 FAILED: Entity " ..
-                    entityHit .. " (Model: " .. model .. ") has NO 'atlas_grove' tag.")
                 end
+            elseif IsControlJustPressed(0, 0x760A9C6F) and debugMode then
+                print("^1[Atlas]^7 G Pressed. No node found at coordinate key: " .. key)
             end
         end
     end
@@ -101,20 +93,25 @@ end)
 -- [[ SYNC & CLEANUP ]]
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
 AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
+    -- Clean world of all managed tree models before sync
     local objects = GetGamePool('CObject')
     for _, entity in ipairs(objects) do
-        if DecorExistOn(entity, "atlas_grove") then DeleteEntity(entity) end
+        local model = GetEntityModel(entity)
+        -- Add any tree models you use here to ensure a clean slate
+        if model == `p_tree_pine01x` or model == `p_tree_oak01x` or model == `p_pine_01` then
+            DeleteEntity(entity)
+        end
     end
+    GroveRegistry = {}
     for _, node in ipairs(nodes) do SpawnLocalTree(node) end
 end)
 
 RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
 AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
-    local objects = GetGamePool('CObject')
-    for _, entity in ipairs(objects) do
-        if DecorExistOn(entity, "atlas_grove") and DecorGetInt(entity, "atlas_grove") == forestId then
-            SetEntityAsMissionEntity(entity, true, true)
-            DeleteEntity(entity)
+    for key, data in pairs(GroveRegistry) do
+        if data.forest_id == forestId then
+            if DoesEntityExist(data.entity) then DeleteEntity(data.entity) end
+            GroveRegistry[key] = nil
         end
     end
 end)
@@ -131,8 +128,7 @@ RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, center, radius, count, model)
     for i = 1, count do
         local angle, r = math.random() * 2 * math.pi, radius * math.sqrt(math.random())
-        local x, y = center.x + r * math.cos(angle)
-        local y = center.y + r * math.sin(angle)
+        local x, y = center.x + r * math.cos(angle), center.y + r * math.sin(angle)
         local _, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
         TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', fId, vec3(x, y, groundZ), model)
         Citizen.Wait(300)
