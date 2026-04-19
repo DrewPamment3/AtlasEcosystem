@@ -1,21 +1,17 @@
 local isBusy = false
 local debugMode = true
-local GroveRegistry = {} -- Stores node data from DB
+local GroveRegistry = {}
 
 -- [[ UI DRAWING ]]
 local function DrawWoodcuttingPrompt()
     local x, y = 0.5, 0.92
     DrawRect(x, y, 0.12, 0.045, 0, 0, 0, 180)
-
-    -- "G" Button
     SetTextScale(0.38, 0.38)
     SetTextColor(0, 0, 0, 255)
     SetTextCentre(true)
     local gText = CreateVarString(10, "LITERAL_STRING", "G")
     DrawRect(x - 0.035, y, 0.022, 0.032, 255, 255, 255, 255)
     DisplayText(gText, x - 0.035, y - 0.016)
-
-    -- Label
     SetTextScale(0.35, 0.35)
     SetTextColor(255, 255, 255, 255)
     SetTextCentre(false)
@@ -39,7 +35,6 @@ local function SpawnLocalTree(node)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
 
-    -- Register node coordinates for proximity matching
     table.insert(GroveRegistry, {
         coords = vec3(node.x, node.y, node.z),
         forest_id = node.forest_id,
@@ -68,7 +63,6 @@ Citizen.CreateThread(function()
             local entCoords = GetEntityCoords(entityHit)
             local matchedNode = nil
 
-            -- FUZZY MATCH: Check if entity is near any registered DB coordinate
             for _, node in ipairs(GroveRegistry) do
                 if #(entCoords - node.coords) < 1.5 then
                     matchedNode = node
@@ -78,15 +72,9 @@ Citizen.CreateThread(function()
 
             if matchedNode then
                 DrawWoodcuttingPrompt()
-
-                if IsControlJustPressed(0, 0x760A9C6F) then
-                    print("^2[Atlas]^7 Match Found! Forest ID: " .. matchedNode.forest_id)
-                    if not isBusy then
-                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
-                    end
+                if IsControlJustPressed(0, 0x760A9C6F) and not isBusy then
+                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
                 end
-            elseif IsControlJustPressed(0, 0x760A9C6F) and debugMode then
-                print("^1[Atlas]^7 G Pressed. No DB entry within 1.5m of hit entity " .. entityHit)
             end
         end
     end
@@ -104,16 +92,13 @@ AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
     end
     GroveRegistry = {}
     for _, node in ipairs(nodes) do SpawnLocalTree(node) end
-    print("^2[Atlas]^7 Synced " .. #nodes .. " trees to registry.")
 end)
 
 RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
 AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
     for i = #GroveRegistry, 1, -1 do
         if GroveRegistry[i].forest_id == forestId then
-            if DoesEntityExist(GroveRegistry[i].entity) then
-                DeleteEntity(GroveRegistry[i].entity)
-            end
+            if DoesEntityExist(GroveRegistry[i].entity) then DeleteEntity(GroveRegistry[i].entity) end
             table.remove(GroveRegistry, i)
         end
     end
@@ -127,17 +112,23 @@ Citizen.CreateThread(function()
     TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 end)
 
+-- [[ GENERATION LOOP ]]
 RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, center, radius, count, model)
     for i = 1, count do
         local angle, r = math.random() * 2 * math.pi, radius * math.sqrt(math.random())
-        local x, y = center.x + r * math.cos(angle), center.y + r * math.sin(angle)
-        local _, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
-        TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', fId, vec3(x, y, groundZ), model)
+        local x, y = center.x + r * math.cos(angle)
+        local y = center.y + r * math.sin(angle)
+        local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
+
+        if foundGround then
+            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', fId, vec3(x, y, groundZ), model)
+        end
         Citizen.Wait(300)
     end
 end)
 
+-- [[ ANIMATION ]]
 RegisterNetEvent('Atlas_Woodcutting:Client:BeginMinigame')
 AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     isBusy = true
