@@ -1,5 +1,5 @@
 local isBusy = false
-local debugMode = false -- Set to true to see raycast lines
+local debugMode = true -- ALWAYS ON UNTIL FURTHER NOTICE
 
 -- [[ UI DRAWING ]]
 
@@ -40,9 +40,11 @@ local function SpawnLocalTree(node)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
 
-    -- STATE BAG: This is the persistent "stamp"
+    -- STATE BAG Persistent Stamp
     Entity(tree).state:set('atlas_grove', node.forest_id, true)
 
+    if debugMode then print("^3[Atlas Debug]^7 Spawning Tagged Tree: " ..
+        node.model_name .. " | ForestID: " .. node.forest_id) end
     SetModelAsNoLongerNeeded(modelHash)
 end
 
@@ -57,18 +59,32 @@ Citizen.CreateThread(function()
         local start = pCoords + vec3(0, 0, 1.2)
         local target = pCoords + (pForward * 2.5) + vec3(0, 0, 1.2)
 
+        -- VISUAL RAYCAST
         if debugMode then DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255) end
 
         local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 16, playerPed, 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
         if hit == 1 and entityHit ~= 0 then
-            -- Verify metadata tag on the object
             local forestId = Entity(entityHit).state.atlas_grove
+
+            -- IF TAGGED: Draw UI
             if forestId then
                 DrawWoodcuttingPrompt()
-                if IsControlJustReleased(0, 0x760A9C6F) and not isBusy then
-                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
+            end
+
+            -- DEBUG G-PRESS LOGIC
+            if IsControlJustReleased(0, 0x760A9C6F) and debugMode then
+                local model = GetEntityModel(entityHit)
+                print("^3[Atlas Debug Interaction]^7 Pressed G on Entity: " .. entityHit .. " | Model: " .. model)
+
+                if forestId then
+                    print("^2[Atlas Debug Interaction]^7 SUCCESS: Entity HAS tag 'atlas_grove' with value: " .. forestId)
+                    if not isBusy then
+                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
+                    end
+                else
+                    print("^1[Atlas Debug Interaction]^7 FAILED: Entity does NOT have 'atlas_grove' tag.")
                 end
             end
         end
@@ -79,7 +95,6 @@ end)
 
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
 AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
-    -- Clean any existing tagged trees before sync
     local objects = GetGamePool('CObject')
     for _, entity in ipairs(objects) do
         if Entity(entity).state.atlas_grove then DeleteEntity(entity) end
