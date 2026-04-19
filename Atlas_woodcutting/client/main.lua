@@ -46,49 +46,31 @@ Citizen.CreateThread(function()
         local playerPed = PlayerPedId()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
-        local start = pCoords + vec3(0, 0, 1.2)
-        local target = pCoords + (pForward * 3.0) + vec3(0, 0, 1.2)
 
-        -- Always draw the raycast
+        -- UPDATED: Start at 0.9 (waist) and pull distance to 1.8m
+        local start = pCoords + vec3(0, 0, 0.9)
+        local target = pCoords + (pForward * 1.8) + vec3(0, 0, 0.9)
+
         DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255)
 
         local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 255, playerPed, 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
-        -- BUTTON CHECK: Loudest print first
-        if IsControlJustPressed(0, 0x760A9C6F) then
-            print("^3[Atlas Debug]^7 G Key Detected.")
-            print("^3[Atlas Debug]^7 Ray Hit: " .. hit .. " | Entity: " .. (entityHit or 0))
-
-            if hit == 1 and entityHit ~= 0 then
-                local entCoords = GetEntityCoords(entityHit)
-                local matchedNode = nil
-                for _, node in ipairs(GroveRegistry) do
-                    -- 2.0m tolerance for hills
-                    if #(entCoords - node.coords) < 2.0 then
-                        matchedNode = node
-                        break
-                    end
-                end
-
-                if matchedNode then
-                    print("^2[Atlas Debug]^7 SUCCESS: Node found for Forest " .. matchedNode.forest_id)
-                    if not isBusy then
-                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
-                    end
-                else
-                    print("^1[Atlas Debug]^7 FAILED: Tree hit but not found in Registry. Dist to nearest: Check DB.")
-                end
-            end
-        end
-
-        -- UI Rendering
         if hit == 1 and entityHit ~= 0 then
             local entCoords = GetEntityCoords(entityHit)
+            local matchedNode = nil
             for _, node in ipairs(GroveRegistry) do
-                if #(entCoords - node.coords) < 2.0 then
-                    DrawWoodcuttingPrompt()
+                if #(entCoords - node.coords) < 1.5 then
+                    matchedNode = node
                     break
+                end
+            end
+
+            if matchedNode then
+                DrawWoodcuttingPrompt()
+                if IsControlJustPressed(0, 0x760A9C6F) and not isBusy then
+                    print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " .. matchedNode.forest_id)
+                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
                 end
             end
         end
@@ -139,7 +121,8 @@ RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, center, radius, count, model)
     for i = 1, count do
         local angle, r = math.random() * 2 * math.pi, radius * math.sqrt(math.random())
-        local x, y = center.x + r * math.cos(angle), center.y + r * math.sin(angle)
+        local x, y = center.x + r * math.cos(angle)
+        local y = center.y + r * math.sin(angle)
         local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
         if foundGround then
             TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', fId, vec3(x, y, groundZ), model)
