@@ -1,6 +1,14 @@
 local isBusy = false
 local debugMode = true
 
+-- [[ DECORATOR REGISTRATION ]]
+-- 3 = Integer. We register this so the engine knows 'atlas_grove' is a valid data field.
+Citizen.CreateThread(function()
+    if not DecorIsRegisteredAtAll("atlas_grove") then
+        DecorRegister("atlas_grove", 3)
+    end
+end)
+
 -- [[ UI DRAWING ]]
 local function DrawWoodcuttingPrompt()
     local x, y = 0.5, 0.92
@@ -36,10 +44,10 @@ local function SpawnLocalTree(node)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
 
-    -- STATE BAG: Ensure the key is exactly 'atlas_grove'
-    Entity(tree).state:set('atlas_grove', node.forest_id, true)
+    -- DECORATOR SET: This is the hard-coded property you wanted
+    DecorSetInt(tree, "atlas_grove", node.forest_id)
 
-    if debugMode then print("^3[Atlas]^7 Spawned and Tagged: " .. node.model_name .. " (Entity: " .. tree .. ")") end
+    if debugMode then print("^3[Atlas]^7 Tagged Entity " .. tree .. " with Grove ID " .. node.forest_id) end
     SetModelAsNoLongerNeeded(modelHash)
 end
 
@@ -51,46 +59,51 @@ Citizen.CreateThread(function()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
 
-        -- Shooting slightly further (3.0m) to ensure collision
         local start = pCoords + vec3(0, 0, 1.2)
         local target = pCoords + (pForward * 3.0) + vec3(0, 0, 1.2)
 
         if debugMode then DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255) end
 
-        -- MASK 255: Detect everything (World, Props, Peds)
         local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 255, playerPed, 0)
         local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
-        -- 1. BUTTON CHECK (Moved outside entity check)
-        if IsControlJustPressed(0, 0x760A9C6F) then
-            print("^3[Atlas Debug]^7 G Pressed. Raycast Hit: " .. hit .. " | Entity: " .. (entityHit or "None"))
-
-            if hit == 1 and entityHit ~= 0 then
-                local forestId = Entity(entityHit).state.atlas_grove
-                local model = GetEntityModel(entityHit)
-                print("^3[Atlas Debug]^7 Model Hash: " .. model .. " | Tagged ID: " .. (forestId or "NULL"))
-
-                if forestId and not isBusy then
-                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
-                end
+        -- 1. UI DRAWING
+        if hit == 1 and entityHit ~= 0 then
+            -- DecorExist Check
+            if DecorExistOn(entityHit, "atlas_grove") then
+                DrawWoodcuttingPrompt()
             end
         end
 
-        -- 2. UI DRAWING (Visual confirmation)
-        if hit == 1 and entityHit ~= 0 then
-            if Entity(entityHit).state.atlas_grove then
-                DrawWoodcuttingPrompt()
+        -- 2. BUTTON LOGIC
+        if IsControlJustPressed(0, 0x760A9C6F) then
+            print("^3[Atlas Debug]^7 G Pressed. Hit: " .. hit .. " | Entity: " .. (entityHit or "0"))
+
+            if hit == 1 and entityHit ~= 0 then
+                local model = GetEntityModel(entityHit)
+                -- DecorGet Check
+                if DecorExistOn(entityHit, "atlas_grove") then
+                    local groveId = DecorGetInt(entityHit, "atlas_grove")
+                    print("^2[Atlas Debug]^7 SUCCESS: Entity has 'atlas_grove' tag. ID: " .. groveId)
+
+                    if not isBusy then
+                        TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', GetEntityCoords(entityHit))
+                    end
+                else
+                    print("^1[Atlas Debug]^7 FAILED: Entity " ..
+                    entityHit .. " (Model: " .. model .. ") has NO 'atlas_grove' tag.")
+                end
             end
         end
     end
 end)
 
--- [[ EVENTS & SYNC ]]
+-- [[ SYNC & CLEANUP ]]
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
 AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
     local objects = GetGamePool('CObject')
     for _, entity in ipairs(objects) do
-        if Entity(entity).state.atlas_grove then DeleteEntity(entity) end
+        if DecorExistOn(entity, "atlas_grove") then DeleteEntity(entity) end
     end
     for _, node in ipairs(nodes) do SpawnLocalTree(node) end
 end)
@@ -99,7 +112,7 @@ RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
 AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
     local objects = GetGamePool('CObject')
     for _, entity in ipairs(objects) do
-        if Entity(entity).state.atlas_grove == forestId then
+        if DecorExistOn(entity, "atlas_grove") and DecorGetInt(entity, "atlas_grove") == forestId then
             SetEntityAsMissionEntity(entity, true, true)
             DeleteEntity(entity)
         end
