@@ -78,6 +78,6 @@ AddEventHandler('Atlas_Woodcutting:Server:FinishChop', function(token)
     local _source = source
     local task = ActiveTasks[_source]
     if not task or task.token ~= token then return end
-    exports.Atlas_Skilling:AddSkillXP(_source, 'woodcutting', 20)
+    exports.Atlas_skilling:AddSkillXP(_source, 'woodcutting', 20)
     ActiveTasks[_source] = nil
 end)

@@ -49,7 +49,7 @@ Citizen.CreateThread(function()
 
         -- UPDATED: Start at 0.9 (waist) and pull distance to 1.8m
         local start = pCoords + vec3(0, 0, 0.9)
-        local target = pCoords + (pForward * 1.8) + vec3(0, 0, 0.9)
+        local target = pCoords + (pForward * 1.3) + vec3(0, 0, 0.9)
 
         DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255)
 
