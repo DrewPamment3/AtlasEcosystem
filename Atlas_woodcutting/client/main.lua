@@ -1,5 +1,5 @@
 local isBusy = false
-local LocalTrees = {}
+local LocalTrees = {} -- Stores [entityHandle] = forestId
 
 local function DrawTxt(text, x, y)
     SetTextScale(0.35, 0.35)
@@ -9,34 +9,33 @@ local function DrawTxt(text, x, y)
     DisplayText(str, x, y)
 end
 
--- [[ SPAWNING ]]
+-- [[ SPAWNING & ALIGNMENT ]]
+
 local function SpawnLocalTree(node)
-    local modelName = node.model_name
-    local modelHash = GetHashKey(modelName)
+    local modelHash = GetHashKey(node.model_name)
 
-    print("^3[Atlas]^7 Requesting: " .. modelName)
-
-    if not IsModelInCdimage(modelHash) then
-        return print("^1[Atlas]^7 ERROR: Model '" .. modelName .. "' not in manifest.")
+    if not HasModelLoaded(modelHash) then
+        RequestModel(modelHash)
+        while not HasModelLoaded(modelHash) do Citizen.Wait(1) end
     end
 
-    RequestModel(modelHash)
-    local timeout = 0
-    while not HasModelLoaded(modelHash) and timeout < 100 do
-        Citizen.Wait(10)
-        timeout = timeout + 1
-    end
+    -- Fix Slant: Get Ground Z and the Terrain Normal
+    local _, groundZ, normal = GetGroundZAndNormalFor_3dCoord(node.x, node.y, 1000.0)
 
-    if HasModelLoaded(modelHash) then
-        local tree = CreateObject(modelHash, node.x, node.y, node.z, false, false, false)
-        FreezeEntityPosition(tree, true)
-        SetEntityAsMissionEntity(tree, true, true)
-        LocalTrees[tree] = true
-        SetModelAsNoLongerNeeded(modelHash)
-        print("^2[Atlas]^7 Spawned: " .. modelName .. " (Handle: " .. tree .. ")")
-    else
-        print("^1[Atlas]^7 FAILED to load: " .. modelName)
-    end
+    local tree = CreateObject(modelHash, node.x, node.y, groundZ, false, false, false)
+
+    -- Math to align rotation to the ground slant
+    local xR = math.deg(math.asin(normal.y))
+    local yR = math.deg(math.atan2(normal.x, normal.z))
+    SetEntityRotation(tree, -xR, yR, 0.0, 2, true)
+
+    FreezeEntityPosition(tree, true)
+    SetEntityAsMissionEntity(tree, true, true)
+
+    -- Tag the handle with its Forest ID
+    LocalTrees[tree] = node.forest_id
+
+    SetModelAsNoLongerNeeded(modelHash)
 end
 
 RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
@@ -53,6 +52,17 @@ AddEventHandler('Atlas_Woodcutting:Client:SpawnSingleNode', function(node)
     SpawnLocalTree(node)
 end)
 
+-- Wipe specific forest by ID
+RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
+AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
+    for entity, fId in pairs(LocalTrees) do
+        if fId == forestId then
+            if DoesEntityExist(entity) then DeleteEntity(entity) end
+            LocalTrees[entity] = nil
+        end
+    end
+end)
+
 Citizen.CreateThread(function()
     Citizen.Wait(5000)
     TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
@@ -63,6 +73,7 @@ RegisterCommand('refresh_trees', function()
 end)
 
 -- [[ GENERATION ]]
+
 RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
 AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestId, center, radius, count, modelName)
     for i = 1, count do
@@ -80,6 +91,7 @@ AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(forestI
 end)
 
 -- [[ INTERACTION ]]
+
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
@@ -106,57 +118,4 @@ AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
     ClearPedTasks(PlayerPedId())
     isBusy = false
     TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token)
-end)
-
-RegisterCommand('testspawn', function(source, args)
-    local modelName = args[1] or "p_campfire01x"
-    local hash = GetHashKey(modelName)
-
-    print("^3[Atlas]^7 Testing spawn for: " .. modelName .. " (Hash: " .. hash .. ")")
-
-    RequestModel(hash)
-    local timeout = 0
-    while not HasModelLoaded(hash) and timeout < 100 do
-        Citizen.Wait(10)
-        timeout = timeout + 1
-    end
-
-    if HasModelLoaded(hash) then
-        local p = GetEntityCoords(PlayerPedId())
-        local forward = GetEntityForwardVector(PlayerPedId())
-        local spawnPos = p + (forward * 3.0)
-
-        local obj = CreateObject(hash, spawnPos.x, spawnPos.y, spawnPos.z, true, false, false)
-        PlaceObjectOnGroundProperly(obj)
-        FreezeEntityPosition(obj, true)
-
-        print("^2[Atlas]^7 SUCCESS! Object spawned. Handle: " .. obj)
-    else
-        print("^1[Atlas]^7 FAILED: Engine still refuses to load " .. modelName)
-    end
-end)
-
-RegisterCommand('sniff', function()
-    local playerPed = PlayerPedId()
-    local pCoords = GetEntityCoords(playerPed)
-    local pForward = GetEntityForwardVector(playerPed)
-
-    local start = pCoords + vec3(0, 0, 1.0)
-    local target = pCoords + (pForward * 5.0) + vec3(0, 0, 1.0)
-
-    -- Raycast against everything (map, props, peds)
-    local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, -1, playerPed, 0)
-    local _, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(ray)
-
-    if hit == 1 and entityHit ~= 0 then
-        local modelHash = GetEntityModel(entityHit)
-        print("^3[Atlas Sniffer]^7 Hit Entity: " .. entityHit)
-        print("^3[Atlas Sniffer]^7 Model Hash (Decimal): " .. modelHash)
-        print("^3[Atlas Sniffer]^7 Model Hash (Hex): " .. string.format("0x%X", modelHash))
-
-        -- Note: Many world trees won't return a string name, only the hash.
-        -- Use the Decimal hash in your /createforest command if the name is unknown.
-    else
-        print("^1[Atlas Sniffer]^7 Raycast hit nothing. Get closer to the tree.")
-    end
 end)
