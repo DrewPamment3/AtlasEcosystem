@@ -5,7 +5,6 @@ local GlobalNodes = {}
 -- [[ INITIALIZATION ]]
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
-    -- Database queries ONLY happen on the server
     exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
         if nodes then
             GlobalNodes = nodes
@@ -14,11 +13,9 @@ Citizen.CreateThread(function()
     end)
 end)
 
--- RegisterServerEvent is ONLY for server/main.lua
 RegisterServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
 AddEventHandler('Atlas_Woodcutting:Server:PlayerLoaded', function()
-    local _source = source
-    TriggerClientEvent('Atlas_Woodcutting:Client:SyncNodes', _source, GlobalNodes)
+    TriggerClientEvent('Atlas_Woodcutting:Client:SyncNodes', source, GlobalNodes)
 end)
 
 RegisterServerEvent('Atlas_Woodcutting:Server:SaveNode')
@@ -82,6 +79,7 @@ RegisterCommand('wipeforest', function(source, args)
 end)
 
 -- [[ HARVESTING ]]
+
 RegisterServerEvent('Atlas_Woodcutting:Server:RequestStart')
 AddEventHandler('Atlas_Woodcutting:Server:RequestStart', function(coords)
     local _source = source
