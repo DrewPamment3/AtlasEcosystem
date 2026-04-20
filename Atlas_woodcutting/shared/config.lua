@@ -6,6 +6,10 @@ AtlasWoodConfig.InteractionKey = 0x760A9C6F -- G key (0x760A9C6F)
 AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation
 AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds
 
+-- Distance & Rendering
+AtlasWoodConfig.RenderDistance = 400        -- Max distance to render forests (meters)
+AtlasWoodConfig.RespawnMinutesPerTier = 20  -- Base respawn time (doubled per tier level)
+
 -- Admin Command Validation
 AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }   -- Forest radius meters
 AtlasWoodConfig.TreeCountRange = { min = 5, max = 25 } -- Trees per forest
