@@ -25,6 +25,7 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     isStump = isStump or false
     local modelName = isStump and "p_stump" or node.model_name
     local modelHash = GetHashKey(modelName)
+    print(string.format("^2[SPAWN DEBUG]^7 Spawning isStump=%s | Model=%s", tostring(isStump), modelName))
 
     if not HasModelLoaded(modelHash) then
         RequestModel(modelHash)
@@ -38,10 +39,18 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
             return
         end
     end
+    print("^2[SPAWN DEBUG]^7 Model loaded: " .. modelName)
 
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
     local zOffset = AtlasWoodConfig.GetTreeZOffset(modelName)
     local tree = CreateObject(modelHash, node.x, node.y, groundZ - zOffset, false, false, false)
+    
+    if tree == 0 then
+        print("^1[SPAWN DEBUG]^7 ERROR: CreateObject failed for " .. modelName)
+        return
+    end
+    print("^2[SPAWN DEBUG]^7 Created entity: " .. tostring(tree))
+    
     SetEntityRotation(tree, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
@@ -232,36 +241,18 @@ end)
 
 RegisterNetEvent('atlas_woodcutting:client:treeChopDeath')
 AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, treeIndex, nodeData)
-    print("^2[DEBUG]^7 treeChopDeath event received - Forest: " .. forestId .. ", TreeIndex: " .. treeIndex)
-    print("^2[DEBUG]^7 GroveRegistry size: " .. #GroveRegistry)
-    
     -- Find and delete the tree entity
-    local foundAndDeleted = false
     for i = #GroveRegistry, 1, -1 do
-        local node = GroveRegistry[i]
-        print(string.format("^2[DEBUG]^7 Checking registry entry %d: forestId=%s treeIndex=%s isStump=%s", 
-            i, tostring(node.forestId), tostring(node.treeIndex), tostring(node.isStump)))
-        
-        if node.forestId == forestId and node.treeIndex == treeIndex and not node.isStump then
-            print("^2[DEBUG]^7 Found matching tree at index " .. i .. ", attempting to delete entity")
-            if DoesEntityExist(node.entity) then
-                print("^2[DEBUG]^7 Entity exists, deleting...")
-                DeleteEntity(node.entity)
-                foundAndDeleted = true
-            else
-                print("^1[DEBUG]^7 Entity does NOT exist!")
+        if GroveRegistry[i].forestId == forestId and GroveRegistry[i].treeIndex == treeIndex and not GroveRegistry[i].isStump then
+            if DoesEntityExist(GroveRegistry[i].entity) then
+                DeleteEntity(GroveRegistry[i].entity)
             end
             table.remove(GroveRegistry, i)
             break
         end
     end
 
-    if not foundAndDeleted then
-        print("^1[DEBUG]^7 NO MATCHING TREE FOUND IN REGISTRY!")
-    end
-
     -- Spawn stump
-    print("^2[DEBUG]^7 Attempting to spawn stump with nodeData: x=" .. nodeData.x .. " y=" .. nodeData.y .. " z=" .. nodeData.z)
     SpawnLocalTree(nodeData, forestId, treeIndex, true)
     print("^3[Atlas Woodcutting]^7 Tree " .. treeIndex .. " in forest " .. forestId .. " chopped, stump spawned")
 end)
@@ -343,137 +334,12 @@ AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, ce
     end
 end)
 
--- Helper: Try to load and play animation from dictionary
-local function PlayChopAnimation(ped, animData)
-    if not animData then
-        print("^1[Atlas Woodcutting]^7 No animation data provided")
-        return false
-    end
-
-    local dict = animData.dict
-    local anim = animData.anim
-    local timeout = GetGameTimer() + 5000
-
-    -- Try to load animation dictionary
-    if not HasAnimDictLoaded(dict) then
-        RequestAnimDict(dict)
-        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
-            Citizen.Wait(10)
-        end
-    end
-
-    if not HasAnimDictLoaded(dict) then
-        print("^1[Atlas Woodcutting]^7 Failed to load animation dict: " .. dict)
-        return false
-    end
-
-    -- Play animation
-    TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 1, 0, false, false, false)
-    print("^2[Atlas Woodcutting]^7 Playing animation: " .. dict .. " > " .. anim)
-    return true
-end
-
--- Helper: Monitor for chopping interrupts (health drop or movement)
-local function MonitorChoppingInterrupts(ped, token, duration)
-    local startTime = GetGameTimer()
-    local startHealth = GetEntityHealth(ped)
-    local startCoords = GetEntityCoords(ped)
-    local interrupted = false
-    local interruptReason = ""
-
-    while GetGameTimer() - startTime < duration do
-        -- Check if player is dead
-        if IsEntityDead(ped) then
-            interrupted = true
-            interruptReason = "Player died during chop"
-            break
-        end
-
-        -- Check for health drop (damage or hunger)
-        local currentHealth = GetEntityHealth(ped)
-        if currentHealth < startHealth and AtlasWoodConfig.DetectHealthDrop then
-            interrupted = true
-            interruptReason = "Health dropped (damage/hunger)"
-            break
-        end
-
-        -- Check for movement (velocity-based: more reliable than keycodes)
-        if AtlasWoodConfig.DetectMovement then
-            local currentCoords = GetEntityCoords(ped)
-            local movedDistance = #(currentCoords - startCoords)
-            if movedDistance > 0.5 then -- Moved more than 0.5m from start position
-                interrupted = true
-                interruptReason = "Player moved during chop"
-                break
-            end
-        end
-
-        Citizen.Wait(100)
-    end
-
-    return interrupted, interruptReason
-end
-
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     isBusy = true
-    local ped = PlayerPedId()
-    local interrupted = false
-    local interruptReason = "Unknown"
-
-    -- Try to find and load animation dictionary
-    local animData = nil
-    for _, data in ipairs(AtlasWoodConfig.ChopAnimations) do
-        if HasAnimDictLoaded(data.dict) then
-            animData = data
-            break
-        end
-    end
-
-    -- Try loading dictionaries if not already loaded
-    if not animData then
-        for _, data in ipairs(AtlasWoodConfig.ChopAnimations) do
-            RequestAnimDict(data.dict)
-            local checkTimeout = GetGameTimer() + 2000
-            while not HasAnimDictLoaded(data.dict) and GetGameTimer() < checkTimeout do
-                Citizen.Wait(1)
-            end
-            if HasAnimDictLoaded(data.dict) then
-                animData = data
-                break
-            end
-        end
-    end
-
-    -- If animation loaded successfully, play it and monitor for interrupts
-    if animData then
-        if PlayChopAnimation(ped, animData) then
-            interrupted, interruptReason = MonitorChoppingInterrupts(ped, token, AtlasWoodConfig.ChopAnimationTime)
-        end
-    else
-        -- Fallback to scenario if no animation dict available
-        if AtlasWoodConfig.UseScenarioFallback then
-            print("^3[Atlas Woodcutting]^7 No animation dictionary found, using scenario fallback")
-            TaskStartScenarioInPlace(ped, `WORLD_HUMAN_TREE_CHOP`, -1, true)
-            interrupted, interruptReason = MonitorChoppingInterrupts(ped, token, AtlasWoodConfig.ChopAnimationTime)
-        else
-            print("^1[Atlas Woodcutting]^7 No animation available and fallback disabled")
-            isBusy = false
-            return
-        end
-    end
-
-    -- Always clear animation/scenario tasks
-    ClearPedTasks(ped)
-
-    -- Handle result
-    if interrupted then
-        print("^3[Atlas Woodcutting]^7 Chop interrupted: " .. interruptReason)
-        isBusy = false
-        TriggerServerEvent('atlas_woodcutting:server:chopAborted', token)
-    else
-        print("^2[Atlas Woodcutting]^7 Chop completed successfully")
-        isBusy = false
-        TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
-    end
+    TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
+    Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
+    ClearPedTasks(PlayerPedId())
+    isBusy = false
+    TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
 end)

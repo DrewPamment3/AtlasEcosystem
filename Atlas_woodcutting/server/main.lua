@@ -47,6 +47,15 @@ local function GetDistance(x1, y1, z1, x2, y2, z2)
     return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2 + (z2 - z1) ^ 2)
 end
 
+-- Helper: Count table entries  
+local function CountTable(t)
+    local count = 0
+    for _ in pairs(t) do
+        count = count + 1
+    end
+    return count
+end
+
 -- Helper: Subscribe player to nearby forests
 local function SubscribePlayerToForests(playerId, playerCoords)
     local closestForests = {}
@@ -410,12 +419,17 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
 
     local chopTime = os.time()
     ForestTreeStates[forestId][treeIndex] = chopTime
+    print("^2[SERVER DEBUG]^7 Marked forest " .. forestId .. " tree " .. treeIndex .. " as dead")
 
     -- Notify all clients tracking this forest about the dead tree
     if ForestClients[forestId] then
+        print("^2[SERVER DEBUG]^7 Found " .. CountTable(ForestClients[forestId]) .. " subscribed clients for forest " .. forestId)
         for clientId, _ in pairs(ForestClients[forestId]) do
+            print("^2[SERVER DEBUG]^7 Sending treeChopDeath to client " .. clientId)
             TriggerClientEvent('atlas_woodcutting:client:treeChopDeath', clientId, forestId, treeIndex, nodeData)
         end
+    else
+        print("^1[SERVER DEBUG]^7 NO SUBSCRIBED CLIENTS for forest " .. forestId .. "!")
     end
 
     -- Schedule respawn timer
@@ -440,18 +454,6 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
         end)
     end
 
-    ActiveTasks[_source] = nil
-end)
-
-RegisterServerEvent('atlas_woodcutting:server:chopAborted')
-AddEventHandler('atlas_woodcutting:server:chopAborted', function(token)
-    local _source = source
-    local task = ActiveTasks[_source]
-    if not task or task.token ~= token then return end
-
-    -- Simply clear the task, no tree is marked as dead
-    print("^3[Atlas Woodcutting]^7 Chop aborted for player " .. _source .. " (token: " .. token .. ")")
-    VORPcore.NotifyRightTip(_source, "~r~Chop interrupted. Movement detected.", 3000)
     ActiveTasks[_source] = nil
 end)
 

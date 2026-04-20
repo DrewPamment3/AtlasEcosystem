@@ -79,6 +79,7 @@ AtlasWoodConfig.TreeModelZOffsets = {
     ["p_tree_redwood_05"] = 1.0,
     ["p_tree_redwood_05_lg"] = 1.5,
     ["p_tree_engoak_01"] = 1.0,
+    ["prop_tree_stump_01"] = 0.5,  -- Stump model
 }
 
 -- Function to get Z offset for a model (returns default 0.2 if not found)
