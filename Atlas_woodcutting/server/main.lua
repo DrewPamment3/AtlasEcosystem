@@ -164,24 +164,44 @@ RegisterCommand('wipeforest', function(source, args)
         VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
-    if not targetName then
-        VORPcore.NotifyRightTip(_source, "~r~Usage: /wipeforest [forestname]", 4000)
+    
+    local targetId = args[1] and tostring(args[1]):lower() or nil
+    if not targetId then
+        VORPcore.NotifyRightTip(_source, "~r~Usage: /wipeforest [id|all]", 4000)
         return
     end
-    exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE name = ?', { targetName }, function(result)
-        if result and result[1] and result[1].id then
-            local fId = result[1].id
-            exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
-            exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
-            for i = #GlobalNodes, 1, -1 do
-                if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
-            end
-            TriggerClientEvent('atlas_woodcutting:client:wipeSpecificForest', -1, fId)
-            VORPcore.NotifyRightTip(_source, "~g~Forest '" .. targetName .. "' wiped successfully", 4000)
-        else
-            VORPcore.NotifyRightTip(_source, "~r~Forest '" .. targetName .. "' not found", 4000)
+    
+    if targetId == 'all' then
+        -- Wipe all forests
+        exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes')
+        exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests')
+        GlobalNodes = {}
+        TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
+        VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
+        print("^2[Atlas Woodcutting Admin]^7 All forests wiped by " .. _source)
+    else
+        -- Wipe specific forest by ID
+        local fId = tonumber(targetId)
+        if not fId then
+            VORPcore.NotifyRightTip(_source, "~r~Forest ID must be a number", 4000)
+            return
         end
-    end)
+        
+        exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE id = ?', { fId }, function(result)
+            if result and result[1] then
+                exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
+                exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
+                for i = #GlobalNodes, 1, -1 do
+                    if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
+                end
+                TriggerClientEvent('atlas_woodcutting:client:wipeSpecificForest', -1, fId)
+                VORPcore.NotifyRightTip(_source, "~g~Forest ID " .. fId .. " wiped successfully", 4000)
+                print("^2[Atlas Woodcutting Admin]^7 Forest ID " .. fId .. " wiped by " .. _source)
+            else
+                VORPcore.NotifyRightTip(_source, "~r~Forest ID " .. fId .. " not found", 4000)
+            end
+        end)
+    end
 end)
 
 RegisterCommand('listforests', function(source, args)
