@@ -1,7 +1,7 @@
 local isBusy = false
-local GroveRegistry = {}              -- {forestId, treeIndex, coords, entity (tree or stump), isStump}
-local RenderedForests = {}            -- Forests currently being rendered
-local TreeStumpMap = {}               -- Map of treeIndex -> stump entity for quick lookup
+local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stump), isStump}
+local RenderedForests = {} -- Forests currently being rendered
+local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
 -- [[ UI ]]
 local function DrawWoodcuttingPrompt()
@@ -25,7 +25,7 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     isStump = isStump or false
     local modelName = isStump and "p_stump" or node.model_name
     local modelHash = GetHashKey(modelName)
-    
+
     if not HasModelLoaded(modelHash) then
         RequestModel(modelHash)
         local timeout = GetGameTimer() + AtlasWoodConfig.ModelLoadTimeout
@@ -38,7 +38,7 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
             return
         end
     end
-    
+
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
     local tree = CreateObject(modelHash, node.x, node.y, groundZ - 0.2, false, false, false)
     SetEntityRotation(tree, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
@@ -52,11 +52,11 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
         entity = tree,
         isStump = isStump
     })
-    
+
     if isStump then
         TreeStumpMap[treeIndex] = tree
     end
-    
+
     SetModelAsNoLongerNeeded(modelHash)
     return tree
 end
@@ -91,8 +91,10 @@ Citizen.CreateThread(function()
             if matchedNode then
                 DrawWoodcuttingPrompt()
                 if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
-                    print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " .. matchedNode.forestId .. " | Tree " .. matchedNode.treeIndex)
-                    TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId, matchedNode.treeIndex, {
+                    print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " ..
+                    matchedNode.forestId .. " | Tree " .. matchedNode.treeIndex)
+                    TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
+                        matchedNode.treeIndex, {
                         x = matchedNode.coords.x,
                         y = matchedNode.coords.y,
                         z = matchedNode.coords.z
@@ -107,7 +109,8 @@ end)
 RegisterCommand('debugtrees', function()
     print("^3[Atlas Debug]^7 Total in Registry: " .. #GroveRegistry)
     for i, node in ipairs(GroveRegistry) do
-        print(string.format("Node %s: Forest %s | Tree %s | Entity %s | IsStump %s", i, node.forestId, node.treeIndex, tostring(node.entity), tostring(node.isStump)))
+        print(string.format("Node %s: Forest %s | Tree %s | Entity %s | IsStump %s", i, node.forestId, node.treeIndex,
+            tostring(node.entity), tostring(node.isStump)))
     end
 end)
 
@@ -123,18 +126,18 @@ AddEventHandler('atlas_woodcutting:client:loadForests', function(forests, nodes,
     GroveRegistry = {}
     TreeStumpMap = {}
     RenderedForests = {}
-    
+
     -- Load forests in range
     for _, forest in ipairs(forests) do
         RenderedForests[forest.id] = forest
-        
+
         -- Find and spawn all trees for this forest
         local treeIndex = 0
         for _, node in ipairs(nodes) do
             if node.forest_id == forest.id then
                 treeIndex = treeIndex + 1
                 local isDead = forestTreeStates[forest.id] and forestTreeStates[forest.id][treeIndex]
-                
+
                 if isDead then
                     -- Spawn stump
                     SpawnLocalTree(node, forest.id, treeIndex, true)
@@ -145,7 +148,7 @@ AddEventHandler('atlas_woodcutting:client:loadForests', function(forests, nodes,
             end
         end
     end
-    
+
     print("^2[Atlas Woodcutting]^7 Loaded " .. #forests .. " forests in render range")
 end)
 
@@ -161,7 +164,7 @@ AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, tre
             break
         end
     end
-    
+
     -- Spawn stump
     SpawnLocalTree(nodeData, forestId, treeIndex, true)
     print("^3[Atlas Woodcutting]^7 Tree " .. treeIndex .. " in forest " .. forestId .. " chopped, stump spawned")
@@ -179,9 +182,9 @@ AddEventHandler('atlas_woodcutting:client:treeRespawn', function(forestId, treeI
             break
         end
     end
-    
+
     TreeStumpMap[treeIndex] = nil
-    
+
     -- Respawn tree
     SpawnLocalTree(nodeData, forestId, treeIndex, false)
     print("^3[Atlas Woodcutting]^7 Tree " .. treeIndex .. " in forest " .. forestId .. " respawned")
@@ -220,7 +223,7 @@ AddEventHandler('atlas_woodcutting:client:spawnSingleNode', function(node, fores
             end
         end
         treeIndex = treeIndex + 1
-        
+
         SpawnLocalTree(node, forestId, treeIndex, false)
     end
 end)

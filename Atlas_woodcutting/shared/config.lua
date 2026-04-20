@@ -7,8 +7,8 @@ AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation
 AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds
 
 -- Distance & Rendering
-AtlasWoodConfig.RenderDistance = 400        -- Max distance to render forests (meters)
-AtlasWoodConfig.RespawnMinutesPerTier = 20  -- Base respawn time (doubled per tier level)
+AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
+AtlasWoodConfig.RespawnMinutesPerTier = 20 -- Base respawn time (doubled per tier level)
 
 -- Admin Command Validation
 AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }   -- Forest radius meters

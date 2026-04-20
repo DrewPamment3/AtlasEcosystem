@@ -3,9 +3,9 @@ local Config = AtlasWoodConfig -- Reference shared config
 local ActiveTasks = {}
 local GlobalNodes = {}
 local GlobalForests = {}
-local ForestClients = {}           -- Track which players see which forests: {forestId = {playerId1, playerId2, ...}}
-local ForestTreeStates = {}        -- Track dead trees: {forestId = {treeIndex = chopTime, ...}}
-local RespawnTimers = {}           -- Track respawn timers: {forestId_treeIndex = timerId}
+local ForestClients = {}    -- Track which players see which forests: {forestId = {playerId1, playerId2, ...}}
+local ForestTreeStates = {} -- Track dead trees: {forestId = {treeIndex = chopTime, ...}}
+local RespawnTimers = {}    -- Track respawn timers: {forestId_treeIndex = timerId}
 
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
@@ -15,7 +15,7 @@ Citizen.CreateThread(function()
             print("^2[Atlas]^7 Server loaded " .. #forests .. " forests from DB.")
         end
     end)
-    
+
     Citizen.Wait(500)
     exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
         if nodes then
@@ -28,7 +28,7 @@ end)
 -- Helper: Calculate respawn time in seconds based on forest tier
 local function GetRespawnSeconds(forestTier)
     local baseMinutes = Config.RespawnMinutesPerTier
-    local multiplier = math.pow(2, forestTier - 1)  -- Tier 1 = 1x, Tier 2 = 2x, Tier 3 = 4x, Tier 4 = 8x
+    local multiplier = math.pow(2, forestTier - 1) -- Tier 1 = 1x, Tier 2 = 2x, Tier 3 = 4x, Tier 4 = 8x
     return (baseMinutes * multiplier) * 60
 end
 
@@ -50,7 +50,7 @@ end
 -- Helper: Subscribe player to nearby forests
 local function SubscribePlayerToForests(playerId, playerCoords)
     local closestForests = {}
-    
+
     for _, forest in ipairs(GlobalForests) do
         local distance = GetDistance(playerCoords.x, playerCoords.y, playerCoords.z, forest.x, forest.y, forest.z)
         if distance <= Config.RenderDistance then
@@ -64,7 +64,7 @@ local function SubscribePlayerToForests(playerId, playerCoords)
             })
         end
     end
-    
+
     -- Update ForestClients tracking
     for forestId, _ in pairs(ForestClients) do
         local stillInRange = false
@@ -74,19 +74,19 @@ local function SubscribePlayerToForests(playerId, playerCoords)
                 break
             end
         end
-        
+
         if not stillInRange and ForestClients[forestId] then
             ForestClients[forestId][playerId] = nil
         end
     end
-    
+
     for _, forest in ipairs(closestForests) do
         if not ForestClients[forest.id] then
             ForestClients[forest.id] = {}
         end
         ForestClients[forest.id][playerId] = true
     end
-    
+
     return closestForests
 end
 
@@ -95,25 +95,20 @@ AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user then return end
-    
+
     local character = user.getUsedCharacter
     if not character then return end
-    
-    local playerCoords = vec3(character.coords.x, character.coords.y, character.coords.z)
-    local closestForests = SubscribePlayerToForests(_source, playerCoords)
-    
-    -- Send initial forest state to client
-    TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
-end)
 
-RegisterServerEvent('atlas_woodcutting:server:saveNode')
-AddEventHandler('atlas_woodcutting:server:saveNode', function(forestId, coords, modelName)
-    exports.oxmysql:insert('INSERT INTO atlas_woodcutting_nodes (forest_id, x, y, z, model_name) VALUES (?, ?, ?, ?, ?)',
+    -- Get player position from player ped (standard RedM approach)
+    local ped = GetPlayerPed(_source)
+    if ped == 0 then return end
+    
+    local playerCoords = GetEntityCoords(ped)
         { forestId, coords.x, coords.y, coords.z, modelName }, function(id)
             if id then
                 local node = { x = coords.x, y = coords.y, z = coords.z, model_name = modelName, forest_id = forestId }
                 table.insert(GlobalNodes, node)
-                
+
                 -- Broadcast to all clients tracking this forest
                 if ForestClients[forestId] then
                     for clientId, _ in pairs(ForestClients[forestId]) do
@@ -375,9 +370,9 @@ RegisterServerEvent('atlas_woodcutting:server:requestStart')
 AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forestId, treeIndex, nodeData)
     local _source = source
     local token = "CHOP_" .. math.random(1000, 9999)
-    ActiveTasks[_source] = { 
-        token = token, 
-        startTime = os.time(), 
+    ActiveTasks[_source] = {
+        token = token,
+        startTime = os.time(),
         forestId = forestId,
         treeIndex = treeIndex,
         nodeData = nodeData
@@ -407,34 +402,34 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     if not ForestTreeStates[forestId] then
         ForestTreeStates[forestId] = {}
     end
-    
+
     local chopTime = os.time()
     ForestTreeStates[forestId][treeIndex] = chopTime
-    
+
     -- Notify all clients tracking this forest about the dead tree
     if ForestClients[forestId] then
         for clientId, _ in pairs(ForestClients[forestId]) do
             TriggerClientEvent('atlas_woodcutting:client:treeChopDeath', clientId, forestId, treeIndex, nodeData)
         end
     end
-    
+
     -- Schedule respawn timer
     local forest = GetForestById(forestId)
     if forest then
         local respawnSeconds = GetRespawnSeconds(forest.tier)
         local timerKey = forestId .. "_" .. treeIndex
-        
+
         RespawnTimers[timerKey] = SetTimeout(respawnSeconds * 1000, function()
             -- Tree respawns
             ForestTreeStates[forestId][treeIndex] = nil
-            
+
             -- Notify all clients tracking this forest about the respawn
             if ForestClients[forestId] then
                 for clientId, _ in pairs(ForestClients[forestId]) do
                     TriggerClientEvent('atlas_woodcutting:client:treeRespawn', clientId, forestId, treeIndex, nodeData)
                 end
             end
-            
+
             RespawnTimers[timerKey] = nil
             print("^2[Atlas Woodcutting]^7 Tree " .. treeIndex .. " respawned in forest " .. forestId)
         end)
@@ -450,7 +445,7 @@ AddEventHandler('playerDropped', function(reason)
         ActiveTasks[_source] = nil
         print("^2[Atlas Woodcutting]^7 Cleaned up active task for disconnected player " .. _source)
     end
-    
+
     -- Remove from ForestClients tracking
     for forestId, clients in pairs(ForestClients) do
         if clients[_source] then
