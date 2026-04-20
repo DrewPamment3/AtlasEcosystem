@@ -32,7 +32,7 @@ AddEventHandler('atlas_woodcutting:server:saveNode', function(forestId, coords, 
         end)
 end)
 
--- Debug command to check player group/admin status
+-- Advanced debug command to check player group from multiple sources
 RegisterCommand('checkgroup', function(source, args)
     local _source = source
     if _source == 0 then
@@ -42,22 +42,53 @@ RegisterCommand('checkgroup', function(source, args)
 
     local user = VORPcore.getUser(_source)
     if not user then
+        print("^1[Debug]^7 User object is nil!")
         VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
         return
     end
 
+    local character = user.getUsedCharacter()
     local groupStatus = user.group or "user"
-    local isAdmin = (groupStatus == 'admin' or groupStatus == 'superadmin')
-    local adminText = isAdmin and "~g~YES" or "~r~NO"
+    local charGroup = character and character.group or "unknown"
+    local userIdentifier = user.identifier or "unknown"
 
-    print("^2================================================^7")
-    print(string.format("^3Player Group Check for ID %d^7", _source))
-    print("^2================================================^7")
-    print(string.format("^7Current Group: ^6%s^7", groupStatus))
-    print(string.format("^7Is Admin: %s^7", adminText))
-    print("^2================================================^7")
+    -- Query database directly to verify
+    exports.oxmysql:execute('SELECT `group` FROM characters WHERE charidentifier = ?', 
+        { character and character.charIdentifier or "unknown" }, 
+        function(result)
+            local dbCharGroup = (result and result[1] and result[1].group) or "NOT FOUND"
+            
+            -- Also check users table
+            exports.oxmysql:execute('SELECT `group` FROM users WHERE identifier = ?', 
+                { userIdentifier }, 
+                function(userResult)
+                    local dbUserGroup = (userResult and userResult[1] and userResult[1].group) or "NOT FOUND"
+                    
+                    print("^2================================================^7")
+                    print(string.format("^3Advanced Group Check for ID %d^7", _source))
+                    print("^2================================================^7")
+                    print("^3FROM VORPCORE OBJECT:^7")
+                    print(string.format("  ^7user.group: ^6%s^7", groupStatus))
+                    print(string.format("  ^7character.group: ^6%s^7", charGroup))
+                    print("^3FROM DATABASE (DIRECT QUERY):^7")
+                    print(string.format("  ^7characters table: ^6%s^7", dbCharGroup))
+                    print(string.format("  ^7users table: ^6%s^7", dbUserGroup))
+                    print("^3IDENTIFIERS:^7")
+                    print(string.format("  ^7User: ^6%s^7", userIdentifier))
+                    print(string.format("  ^7Character ID: ^6%s^7", character and character.charIdentifier or "unknown"))
+                    print("^2================================================^7")
+                    
+                    if dbCharGroup ~= groupStatus then
+                        print("^1⚠️  MISMATCH!^7 Database shows '" .. dbCharGroup .. "' but VORP shows '" .. groupStatus .. "'")
+                    end
+                    if dbUserGroup ~= groupStatus then
+                        print("^1⚠️  MISMATCH!^7 Users table shows '" .. dbUserGroup .. "' but VORP shows '" .. groupStatus .. "'")
+                    end
+                    print("^2================================================^7")
+                end)
+        end)
 
-    VORPcore.NotifyRightTip(_source, "^3Check console for group info", 4000)
+    VORPcore.NotifyRightTip(_source, "^3Checking group from database...", 4000)
 end)
 
 RegisterCommand('createforest', function(source, args)
