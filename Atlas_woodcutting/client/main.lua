@@ -359,6 +359,7 @@ end
 local function MonitorChoppingInterrupts(ped, token, duration)
     local startTime = GetGameTimer()
     local startHealth = GetEntityHealth(ped)
+    local startCoords = GetEntityCoords(ped)
     local interrupted = false
     local interruptReason = ""
 
@@ -378,10 +379,11 @@ local function MonitorChoppingInterrupts(ped, token, duration)
             break
         end
 
-        -- Check for movement input (WASD)
+        -- Check for movement (velocity-based: more reliable than keycodes)
         if AtlasWoodConfig.DetectMovement then
-            -- W key = 32, A key = 33, S key = 35, D key = 34 (disabled spacebar = 32)
-            if IsControlPressed(0, 32) or IsControlPressed(0, 33) or IsControlPressed(0, 34) or IsControlPressed(0, 35) then
+            local currentCoords = GetEntityCoords(ped)
+            local movedDistance = #(currentCoords - startCoords)
+            if movedDistance > 0.5 then -- Moved more than 0.5m from start position
                 interrupted = true
                 interruptReason = "Player moved during chop"
                 break
