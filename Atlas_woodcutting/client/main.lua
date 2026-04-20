@@ -115,6 +115,17 @@ RegisterCommand('debugtrees', function()
     end
 end)
 
+--- List all available tree models
+RegisterCommand('listtrees', function()
+    print("^2[Atlas Woodcutting]^7 Available Tree Models:")
+    print("^3================================================^7")
+    for modelName, _ in pairs(AtlasWoodConfig.TreeModelZOffsets) do
+        print("^2 - ^7" .. modelName)
+    end
+    print("^3================================================^7")
+    print("^3Usage:^7 /createforest [radius] [count] [tier] [model] [name]")
+end)
+
 --- DEBUG: Spawn tree model in front of player with custom Z offset
 RegisterCommand('spawntree', function(source, args, rawCommand)
     -- Client-side: source is always 0, args is a TABLE directly
