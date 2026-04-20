@@ -214,19 +214,19 @@ end)
 
 RegisterNetEvent('atlas_woodcutting:client:spawnSingleNode')
 AddEventHandler('atlas_woodcutting:client:spawnSingleNode', function(node, forestId)
-    -- Spawn a single new tree when a node is added to a forest we're tracking
-    if RenderedForests[forestId] then
-        local treeIndex = 0
-        -- Count existing trees for this forest to get the new index
-        for _, registryNode in ipairs(GroveRegistry) do
-            if registryNode.forestId == forestId and not registryNode.isStump then
-                treeIndex = treeIndex + 1
-            end
+    -- Spawn a single new tree when a node is added to a forest
+    -- (doesn't matter if we're currently rendering the forest - loadForests will handle state)
+    
+    -- Count existing trees for this forest to get the new index
+    local treeIndex = 0
+    for _, registryNode in ipairs(GroveRegistry) do
+        if registryNode.forestId == forestId and not registryNode.isStump then
+            treeIndex = treeIndex + 1
         end
-        treeIndex = treeIndex + 1
-
-        SpawnLocalTree(node, forestId, treeIndex, false)
     end
+    treeIndex = treeIndex + 1
+
+    SpawnLocalTree(node, forestId, treeIndex, false)
 end)
 
 Citizen.CreateThread(function()

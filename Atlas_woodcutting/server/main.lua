@@ -214,11 +214,13 @@ RegisterCommand('spawntree', function(source, args)
     end
 
     local pCoords = GetEntityCoords(ped)
-    local pForward = GetEntityForwardVector(ped)
+    local heading = GetEntityHeading(ped)
+    local forwardX = math.sin(math.rad(heading))
+    local forwardY = -math.cos(math.rad(heading))
 
     -- Spawn 3 meters in front of player
-    local spawnX = pCoords.x + (pForward.x * 3)
-    local spawnY = pCoords.y + (pForward.y * 3)
+    local spawnX = pCoords.x + (forwardX * 3)
+    local spawnY = pCoords.y + (forwardY * 3)
     local spawnZ = pCoords.z
 
     -- Get ground Z
