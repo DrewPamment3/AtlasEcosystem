@@ -34,6 +34,11 @@ end)
 
 RegisterCommand('createforest', function(source, args)
     local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /createforest is for in-game players only")
+        return
+    end
+
     local user = VORPcore.getUser(_source)
     if not user or user.group ~= 'admin' then
         VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
@@ -45,11 +50,13 @@ RegisterCommand('createforest', function(source, args)
 
     -- Validate parameters against config ranges
     if radius < Config.RadiusRange.min or radius > Config.RadiusRange.max then
-        VORPcore.NotifyRightTip(_source, "~r~Radius must be " .. Config.RadiusRange.min .. "-" .. Config.RadiusRange.max, 4000)
+        VORPcore.NotifyRightTip(_source, "~r~Radius must be " .. Config.RadiusRange.min .. "-" .. Config.RadiusRange.max,
+            4000)
         return
     end
     if count < Config.TreeCountRange.min or count > Config.TreeCountRange.max then
-        VORPcore.NotifyRightTip(_source, "~r~Count must be " .. Config.TreeCountRange.min .. "-" .. Config.TreeCountRange.max, 4000)
+        VORPcore.NotifyRightTip(_source,
+            "~r~Count must be " .. Config.TreeCountRange.min .. "-" .. Config.TreeCountRange.max, 4000)
         return
     end
     if tier < Config.TierRange.min or tier > Config.TierRange.max then
@@ -72,6 +79,11 @@ end)
 
 RegisterCommand('wipeforest', function(source, args)
     local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /wipeforest is for in-game players only")
+        return
+    end
+
     local user = VORPcore.getUser(_source)
     if not user or user.group ~= 'admin' then
         VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
@@ -100,57 +112,67 @@ end)
 
 RegisterCommand('listforests', function(source, args)
     local _source = source
-    local user = VORPcore.getUser(_source)
-    if not user or user.group ~= 'admin' then
-        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /listforests is for in-game players only")
         return
     end
-    
+
+    local user = VORPcore.getUser(_source)
+    if not user or user.group ~= 'admin' then
+        if _source ~= 0 then
+            VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        end
+        return
+    end
+
     local page = tonumber(args[1]) or 1
     if page < 1 then page = 1 end
-    
-    exports.oxmysql:execute('SELECT id, name, radius, tree_count, tier, x, y, z FROM atlas_woodcutting_forests ORDER BY name ASC', {}, function(result)
-        if not result or #result == 0 then
-            print("^3[Atlas Woodcutting]^7 No forests found in database.")
-            return
-        end
-        
-        local itemsPerPage = 10
-        local totalForests = #result
-        local totalPages = math.ceil(totalForests / itemsPerPage)
-        
-        if page > totalPages then page = totalPages end
-        
-        local startIdx = (page - 1) * itemsPerPage + 1
-        local endIdx = math.min(page * itemsPerPage, totalForests)
-        
-        -- Print header
-        print("^2================================================^7")
-        print(string.format("^2 ATLAS WOODCUTTING FORESTS - PAGE %d/%d^7", page, totalPages))
-        print("^2================================================^7")
-        print(string.format("^3%-4s^7 | ^3%-18s^7 | ^3%-7s^7 | ^3%-5s^7 | ^3%-4s^7 | ^3%-8s^7 | ^3%-8s^7 | ^3%-8s^7", 
-            "ID", "Name", "Radius", "Trees", "Tier", "X", "Y", "Z"))
-        print("^2----|--------------------|---------|---------|---------|-----------|-----------|-----------^7")
-        
-        -- Print forest entries
-        for i = startIdx, endIdx do
-            local forest = result[i]
-            print(string.format("^7%-4d^7 | ^6%-18s^7 | ^5%-7.1f^7 | ^4%-5d^7 | ^3%-4d^7 | ^2%-8.2f^7 | ^2%-8.2f^7 | ^2%-8.2f^7",
-                forest.id,
-                forest.name:sub(1, 18),
-                forest.radius,
-                forest.tree_count,
-                forest.tier,
-                forest.x,
-                forest.y,
-                forest.z
-            ))
-        end
-        
-        print("^2================================================^7")
-        print(string.format("^3Total: %d forests | Showing %d-%d^7", totalForests, startIdx, endIdx))
-        print("^2================================================^7")
-    end)
+
+    exports.oxmysql:execute(
+    'SELECT id, name, radius, tree_count, tier, x, y, z FROM atlas_woodcutting_forests ORDER BY name ASC', {},
+        function(result)
+            if not result or #result == 0 then
+                print("^3[Atlas Woodcutting]^7 No forests found in database.")
+                return
+            end
+
+            local itemsPerPage = 10
+            local totalForests = #result
+            local totalPages = math.ceil(totalForests / itemsPerPage)
+
+            if page > totalPages then page = totalPages end
+
+            local startIdx = (page - 1) * itemsPerPage + 1
+            local endIdx = math.min(page * itemsPerPage, totalForests)
+
+            -- Print header
+            print("^2================================================^7")
+            print(string.format("^2 ATLAS WOODCUTTING FORESTS - PAGE %d/%d^7", page, totalPages))
+            print("^2================================================^7")
+            print(string.format("^3%-4s^7 | ^3%-18s^7 | ^3%-7s^7 | ^3%-5s^7 | ^3%-4s^7 | ^3%-8s^7 | ^3%-8s^7 | ^3%-8s^7",
+                "ID", "Name", "Radius", "Trees", "Tier", "X", "Y", "Z"))
+            print("^2----|--------------------|---------|---------|---------|-----------|-----------|-----------^7")
+
+            -- Print forest entries
+            for i = startIdx, endIdx do
+                local forest = result[i]
+                print(string.format(
+                    "^7%-4d^7 | ^6%-18s^7 | ^5%-7.1f^7 | ^4%-5d^7 | ^3%-4d^7 | ^2%-8.2f^7 | ^2%-8.2f^7 | ^2%-8.2f^7",
+                    forest.id,
+                    forest.name:sub(1, 18),
+                    forest.radius,
+                    forest.tree_count,
+                    forest.tier,
+                    forest.x,
+                    forest.y,
+                    forest.z
+                ))
+            end
+
+            print("^2================================================^7")
+            print(string.format("^3Total: %d forests | Showing %d-%d^7", totalForests, startIdx, endIdx))
+            print("^2================================================^7")
+        end)
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:requestStart')
