@@ -317,11 +317,11 @@ Citizen.CreateThread(function()
     TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
 end)
 
--- Periodic re-subscription: update player's forest subscriptions every 10 seconds
+-- Periodic subscription update: refresh every 15 seconds (without clearing entities)
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(10000) -- Check every 10 seconds
-        TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
+        Citizen.Wait(15000) -- Update subscriptions every 15 seconds
+        TriggerServerEvent('atlas_woodcutting:server:updateSubscriptions')
     end
 end)
 

@@ -115,8 +115,27 @@ AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     local playerCoords = GetEntityCoords(ped)
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
 
-    -- Send initial forest state to client
+    -- Send initial forest state to client (full load with all trees)
     TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
+end)
+
+-- Periodic subscription update (WITHOUT reloading all trees)
+RegisterServerEvent('atlas_woodcutting:server:updateSubscriptions')
+AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
+    local _source = source
+    local user = VORPcore.getUser(_source)
+    if not user then return end
+
+    local character = user.getUsedCharacter
+    if not character then return end
+
+    -- Get player position from player ped
+    local ped = GetPlayerPed(_source)
+    if ped == 0 then return end
+
+    local playerCoords = GetEntityCoords(ped)
+    -- Just update subscriptions, don't send full loadForests event
+    SubscribePlayerToForests(_source, playerCoords)
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:saveNode')
