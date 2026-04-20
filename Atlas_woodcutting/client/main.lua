@@ -115,6 +115,71 @@ RegisterCommand('debugtrees', function()
     end
 end)
 
+--- DEBUG: Spawn tree model in front of player with custom Z offset
+RegisterCommand('spawntree', function(args)
+    if not args[1] then
+        TriggerEvent('chat:addMessage', {
+            color = {255, 0, 0},
+            multiline = true,
+            args = {"Debug", "Usage: /spawntree [model] [zOffset]"}
+        })
+        return
+    end
+
+    local modelName = args[1]
+    local zOffset = args[2] and tonumber(args[2]) or 0.2
+
+    if not zOffset or zOffset < 0 then
+        zOffset = 0.2
+    end
+
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+    local forwardX = math.sin(math.rad(heading))
+    local forwardY = -math.cos(math.rad(heading))
+
+    -- Spawn 3 meters in front of player
+    local spawnX = pCoords.x + (forwardX * 3)
+    local spawnY = pCoords.y + (forwardY * 3)
+    local spawnZ = pCoords.z
+
+    -- Get ground Z
+    local found, groundZ = GetGroundZFor_3dCoord(spawnX, spawnY, 1000.0, 0)
+    if found then
+        spawnZ = groundZ - zOffset
+    end
+
+    -- Load and spawn model
+    local modelHash = GetHashKey(modelName)
+    if not IsModelValid(modelHash) then
+        print("^1[Atlas Debug]^7 Invalid model: " .. modelName)
+        return
+    end
+
+    if not HasModelLoaded(modelHash) then
+        RequestModel(modelHash)
+        local timeout = GetGameTimer() + 5000
+        while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do
+            Citizen.Wait(1)
+        end
+
+        if not HasModelLoaded(modelHash) then
+            print("^1[Atlas Debug]^7 Failed to load model " .. modelName .. " within timeout")
+            return
+        end
+    end
+
+    local tree = CreateObject(modelHash, spawnX, spawnY, spawnZ, false, false, false)
+    SetEntityRotation(tree, 0.0, 0.0, 0.0, 2, true)
+    FreezeEntityPosition(tree, true)
+    SetEntityAsMissionEntity(tree, true, true)
+    SetModelAsNoLongerNeeded(modelHash)
+
+    print("^2[Atlas Debug]^7 Spawned " .. modelName .. " with Z offset: " .. zOffset)
+    print("^2[Atlas Debug]^7 Position: (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
+end)
+
 -- [[ EVENTS ]]
 RegisterNetEvent('atlas_woodcutting:client:loadForests')
 AddEventHandler('atlas_woodcutting:client:loadForests', function(forests, nodes, forestTreeStates)

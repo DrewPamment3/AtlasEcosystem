@@ -120,6 +120,40 @@
 - ✅ Don't assume data is available immediately after trigger
 - ✅ Broadcast state changes AFTER database confirms success
 
+## 11. Server-Side Commands with Client-Only Natives
+**Mistake:** Using client-only game natives in server-side command handlers
+- ❌ Server-side `/spawntree` using `GetGameTimer()`, `GetGroundZFor_3dCoord()`, `CreateObject()`
+- ❌ These natives only exist on the **CLIENT**, not on the server
+- ❌ Result: Script crashes with "attempt to call a nil value"
+
+**Client-Only Natives (NEVER use in RegisterCommand on server):**
+- `GetGameTimer()` - only client
+- `GetGroundZFor_3dCoord()` - only client
+- `CreateObject()` - only client
+- `GetPlayerPed(source)` - server can use, but with restrictions
+- `RequestModel()`, `HasModelLoaded()` - client only
+- `GetHashKey()` - works on both, but usually implicit
+- Entity creation/manipulation - mostly client
+
+**Correct Approach:**
+- ✅ Put debug/testing commands that need game natives on the **CLIENT-SIDE**
+- ✅ Server-side `RegisterCommand` → only do server logic (DB, notifications, validation)
+- ✅ If you need game interaction: use client command `RegisterCommand()` in client file
+- ✅ Pattern for data needing server: Client triggers server event → server processes → broadcasts back to client
+
+**Example Fix:**
+```lua
+-- WRONG: Server-side command
+RegisterCommand('spawntree', function(source, args)
+    local tree = CreateObject(...) -- ❌ CRASH: CreateObject doesn't exist on server
+end)
+
+-- RIGHT: Client-side command
+RegisterCommand('spawntree', function(args)
+    local tree = CreateObject(...) -- ✅ Works, client has this native
+end)
+```
+
 ---
 
 ## Quick Checklist Before Submitting Code
@@ -130,3 +164,5 @@
 - [ ] Did you validate models with `IsModelValid()` before loading?
 - [ ] Are events properly broadcasting (-1 for all, -source for others)?
 - [ ] Did you account for async callback execution?
+- [ ] Are client-only natives (CreateObject, GetGameTimer, etc) only in CLIENT files?
+- [ ] Is your server-side RegisterCommand only doing server logic, not game manipulation?
