@@ -80,7 +80,8 @@ RegisterCommand('givexp', function(source, args)
     else
         local User = VORPcore.getUser(_source)
         if User then
-            userGroup = User.group or "user"
+            local character = User.getUsedCharacter
+            userGroup = character and character.group or "user"
             if userGroup == 'admin' or userGroup == 'superadmin' then
                 canExecute = true
             end

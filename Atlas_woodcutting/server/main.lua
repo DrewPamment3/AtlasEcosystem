@@ -101,7 +101,14 @@ RegisterCommand('createforest', function(source, args)
     end
 
     local user = VORPcore.getUser(_source)
-    if not user or user.group ~= 'admin' then
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+    
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
         VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
@@ -146,11 +153,17 @@ RegisterCommand('wipeforest', function(source, args)
     end
 
     local user = VORPcore.getUser(_source)
-    if not user or user.group ~= 'admin' then
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+    
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
         VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
-    local targetName = args[1]
     if not targetName then
         VORPcore.NotifyRightTip(_source, "~r~Usage: /wipeforest [forestname]", 4000)
         return
@@ -179,7 +192,15 @@ RegisterCommand('listforests', function(source, args)
     end
 
     local user = VORPcore.getUser(_source)
-    if not user or user.group ~= 'admin' then
+    if not user then
+        print("^1[Debug]^7 User object is nil!")
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+    
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
         if _source ~= 0 then
             VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         end
