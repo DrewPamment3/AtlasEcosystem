@@ -32,6 +32,34 @@ AddEventHandler('atlas_woodcutting:server:saveNode', function(forestId, coords, 
         end)
 end)
 
+-- Debug command to check player group/admin status
+RegisterCommand('checkgroup', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local groupStatus = user.group or "user"
+    local isAdmin = (groupStatus == 'admin' or groupStatus == 'superadmin')
+    local adminText = isAdmin and "~g~YES" or "~r~NO"
+
+    print("^2================================================^7")
+    print(string.format("^3Player Group Check for ID %d^7", _source))
+    print("^2================================================^7")
+    print(string.format("^7Current Group: ^6%s^7", groupStatus))
+    print(string.format("^7Is Admin: %s^7", adminText))
+    print("^2================================================^7")
+
+    VORPcore.NotifyRightTip(_source, "^3Check console for group info", 4000)
+end)
+
 RegisterCommand('createforest', function(source, args)
     local _source = source
     if _source == 0 then
@@ -129,7 +157,7 @@ RegisterCommand('listforests', function(source, args)
     if page < 1 then page = 1 end
 
     exports.oxmysql:execute(
-    'SELECT id, name, radius, tree_count, tier, x, y, z FROM atlas_woodcutting_forests ORDER BY name ASC', {},
+        'SELECT id, name, radius, tree_count, tier, x, y, z FROM atlas_woodcutting_forests ORDER BY name ASC', {},
         function(result)
             if not result or #result == 0 then
                 print("^3[Atlas Woodcutting]^7 No forests found in database.")
