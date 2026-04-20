@@ -102,7 +102,7 @@ AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     -- Get player position from player ped (standard RedM approach)
     local ped = GetPlayerPed(_source)
     if ped == 0 then return end
-    
+
     local playerCoords = GetEntityCoords(ped)
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
 

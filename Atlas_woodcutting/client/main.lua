@@ -93,13 +93,13 @@ Citizen.CreateThread(function()
                 DrawWoodcuttingPrompt()
                 if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
                     print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " ..
-                    matchedNode.forestId .. " | Tree " .. matchedNode.treeIndex)
+                        matchedNode.forestId .. " | Tree " .. matchedNode.treeIndex)
                     TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
                         matchedNode.treeIndex, {
-                        x = matchedNode.coords.x,
-                        y = matchedNode.coords.y,
-                        z = matchedNode.coords.z
-                    })
+                            x = matchedNode.coords.x,
+                            y = matchedNode.coords.y,
+                            z = matchedNode.coords.z
+                        })
                 end
             end
         end
@@ -116,24 +116,19 @@ RegisterCommand('debugtrees', function()
 end)
 
 --- DEBUG: Spawn tree model in front of player with custom Z offset
-RegisterCommand('spawntree', function(args)
-    -- Client-side commands receive args as a STRING, need to parse it
-    local arguments = {}
-    for match in string.gmatch(args, "%S+") do
-        table.insert(arguments, match)
-    end
-    
-    if not arguments[1] then
+RegisterCommand('spawntree', function(source, args, rawCommand)
+    -- Client-side: source is always 0, args is a TABLE directly
+    if not args[1] then
         TriggerEvent('chat:addMessage', {
-            color = {255, 0, 0},
+            color = { 255, 0, 0 },
             multiline = true,
-            args = {"Debug", "Usage: /spawntree [model] [zOffset]"}
+            args = { "Debug", "Usage: /spawntree [model] [zOffset]" }
         })
         return
     end
 
-    local modelName = arguments[1]
-    local zOffset = arguments[2] and tonumber(arguments[2]) or 0.2
+    local modelName = args[1]
+    local zOffset = args[2] and tonumber(args[2]) or 0.2
 
     if not zOffset or zOffset < 0 then
         zOffset = 0.2
@@ -287,7 +282,7 @@ RegisterNetEvent('atlas_woodcutting:client:spawnSingleNode')
 AddEventHandler('atlas_woodcutting:client:spawnSingleNode', function(node, forestId)
     -- Spawn a single new tree when a node is added to a forest
     -- (doesn't matter if we're currently rendering the forest - loadForests will handle state)
-    
+
     -- Count existing trees for this forest to get the new index
     local treeIndex = 0
     for _, registryNode in ipairs(GroveRegistry) do
