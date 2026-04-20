@@ -102,18 +102,40 @@ end
 RegisterServerEvent('atlas_woodcutting:server:playerLoaded')
 AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     local _source = source
+    print("^2[PLAYER LOAD DEBUG]^7 playerLoaded triggered for source " .. _source)
+    
     local user = VORPcore.getUser(_source)
-    if not user then return end
+    if not user then 
+        print("^1[PLAYER LOAD DEBUG]^7 User is nil")
+        return 
+    end
 
     local character = user.getUsedCharacter
-    if not character then return end
+    if not character then 
+        print("^1[PLAYER LOAD DEBUG]^7 Character is nil")
+        return 
+    end
 
     -- Get player position from player ped (standard RedM approach)
     local ped = GetPlayerPed(_source)
-    if ped == 0 then return end
+    if ped == 0 then 
+        print("^1[PLAYER LOAD DEBUG]^7 Ped is 0 (not spawned yet)")
+        return 
+    end
+    
+    print("^2[PLAYER LOAD DEBUG]^7 Ped ID: " .. tostring(ped))
 
     local playerCoords = GetEntityCoords(ped)
+    print(string.format("^2[PLAYER LOAD DEBUG]^7 Player coords: %.2f, %.2f, %.2f", playerCoords.x, playerCoords.y, playerCoords.z))
+    
+    print("^2[PLAYER LOAD DEBUG]^7 Total forests in GlobalForests: " .. #GlobalForests)
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
+    print("^2[PLAYER LOAD DEBUG]^7 Found " .. #closestForests .. " forests in range")
+    
+    -- Debug: show ForestClients status AFTER subscription
+    for fId, clients in pairs(ForestClients) do
+        print(string.format("^2[PLAYER LOAD DEBUG]^7 ForestClients[%d] = %d clients", fId, CountTable(clients)))
+    end
 
     -- Send initial forest state to client
     TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
