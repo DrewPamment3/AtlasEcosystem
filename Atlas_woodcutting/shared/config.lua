@@ -1,6 +1,16 @@
 AtlasWoodConfig = {}
 
-AtlasWoodConfig.MinChopTime = 5000 -- 5 Seconds
+-- Interaction & Rewards
+AtlasWoodConfig.ChopXPReward = 20           -- XP per successful chop
+AtlasWoodConfig.InteractionKey = 0x760A9C6F -- G key (0x760A9C6F)
+AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation
+AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds
+
+-- Admin Command Validation
+AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }   -- Forest radius meters
+AtlasWoodConfig.TreeCountRange = { min = 5, max = 25 } -- Trees per forest
+AtlasWoodConfig.TierRange = { min = 1, max = 4 }       -- Forest tier levels
+AtlasWoodConfig.ModelLoadTimeout = 5000                -- Model load wait time (ms)
 
 -- Loot Scaling
 AtlasWoodConfig.WoodTiers = {

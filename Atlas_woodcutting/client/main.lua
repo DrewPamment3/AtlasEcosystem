@@ -23,7 +23,15 @@ local function SpawnLocalTree(node)
     local modelHash = GetHashKey(node.model_name)
     if not HasModelLoaded(modelHash) then
         RequestModel(modelHash)
-        while not HasModelLoaded(modelHash) do Citizen.Wait(1) end
+        local timeout = GetGameTimer() + AtlasWoodConfig.ModelLoadTimeout
+        while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do
+            Citizen.Wait(1)
+        end
+
+        if not HasModelLoaded(modelHash) then
+            print("^1[Atlas Woodcutting]^7 Failed to load model " .. node.model_name .. " within timeout")
+            return
+        end
     end
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
     local tree = CreateObject(modelHash, node.x, node.y, groundZ - 0.2, false, false, false)
@@ -47,7 +55,7 @@ Citizen.CreateThread(function()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
 
-        -- UPDATED: Start at 0.9 (waist) and pull distance to 1.8m
+        -- UPDATED: Start at 0.9 (waist) and pull distance to 1.3m
         local start = pCoords + vec3(0, 0, 0.9)
         local target = pCoords + (pForward * 1.3) + vec3(0, 0, 0.9)
 
@@ -68,9 +76,9 @@ Citizen.CreateThread(function()
 
             if matchedNode then
                 DrawWoodcuttingPrompt()
-                if IsControlJustPressed(0, 0x760A9C6F) and not isBusy then
+                if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
                     print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " .. matchedNode.forest_id)
-                    TriggerServerEvent('Atlas_Woodcutting:Server:RequestStart', entCoords)
+                    TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords)
                 end
             end
         end
@@ -81,13 +89,13 @@ end)
 RegisterCommand('debugtrees', function()
     print("^3[Atlas Debug]^7 Total in Registry: " .. #GroveRegistry)
     for i, node in ipairs(GroveRegistry) do
-        print(string.format("Node %s: Forest %s | Entity %s", i, node.forest_id, node.entity))
+        print(string.format("Node %s: Forest %s | Entity %s", i, node.forest_id, tostring(node.entity)))
     end
 end)
 
 -- [[ EVENTS ]]
-RegisterNetEvent('Atlas_Woodcutting:Client:SyncNodes')
-AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
+RegisterNetEvent('atlas_woodcutting:client:syncNodes')
+AddEventHandler('atlas_woodcutting:client:syncNodes', function(nodes)
     local objects = GetGamePool('CObject')
     for _, entity in ipairs(objects) do
         local model = GetEntityModel(entity)
@@ -99,8 +107,8 @@ AddEventHandler('Atlas_Woodcutting:Client:SyncNodes', function(nodes)
     for _, node in ipairs(nodes) do SpawnLocalTree(node) end
 end)
 
-RegisterNetEvent('Atlas_Woodcutting:Client:WipeSpecificForest')
-AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId)
+RegisterNetEvent('atlas_woodcutting:client:wipeSpecificForest')
+AddEventHandler('atlas_woodcutting:client:wipeSpecificForest', function(forestId)
     for i = #GroveRegistry, 1, -1 do
         if GroveRegistry[i].forest_id == forestId then
             if DoesEntityExist(GroveRegistry[i].entity) then DeleteEntity(GroveRegistry[i].entity) end
@@ -109,34 +117,34 @@ AddEventHandler('Atlas_Woodcutting:Client:WipeSpecificForest', function(forestId
     end
 end)
 
-RegisterNetEvent('Atlas_Woodcutting:Client:SpawnSingleNode')
-AddEventHandler('Atlas_Woodcutting:Client:SpawnSingleNode', function(node) SpawnLocalTree(node) end)
+RegisterNetEvent('atlas_woodcutting:client:spawnSingleNode')
+AddEventHandler('atlas_woodcutting:client:spawnSingleNode', function(node) SpawnLocalTree(node) end)
 
 Citizen.CreateThread(function()
     Citizen.Wait(5000)
-    TriggerServerEvent('Atlas_Woodcutting:Server:PlayerLoaded')
+    TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
 end)
 
-RegisterNetEvent('Atlas_Woodcutting:Client:GenerateForestNodes')
-AddEventHandler('Atlas_Woodcutting:Client:GenerateForestNodes', function(fId, center, radius, count, model)
+RegisterNetEvent('atlas_woodcutting:client:generateForestNodes')
+AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, center, radius, count, model)
     for i = 1, count do
         local angle, r = math.random() * 2 * math.pi, radius * math.sqrt(math.random())
-        local x, y = center.x + r * math.cos(angle)
+        local x = center.x + r * math.cos(angle)
         local y = center.y + r * math.sin(angle)
         local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
         if foundGround then
-            TriggerServerEvent('Atlas_Woodcutting:Server:SaveNode', fId, vec3(x, y, groundZ), model)
+            TriggerServerEvent('atlas_woodcutting:server:saveNode', fId, vec3(x, y, groundZ), model)
         end
         Citizen.Wait(300)
     end
 end)
 
-RegisterNetEvent('Atlas_Woodcutting:Client:BeginMinigame')
-AddEventHandler('Atlas_Woodcutting:Client:BeginMinigame', function(token)
+RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
+AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     isBusy = true
     TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
-    Citizen.Wait(5000)
+    Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
     ClearPedTasks(PlayerPedId())
     isBusy = false
-    TriggerServerEvent('Atlas_Woodcutting:Server:FinishChop', token)
+    TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
 end)
