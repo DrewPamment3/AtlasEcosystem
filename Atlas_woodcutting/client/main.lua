@@ -232,18 +232,36 @@ end)
 
 RegisterNetEvent('atlas_woodcutting:client:treeChopDeath')
 AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, treeIndex, nodeData)
+    print("^2[DEBUG]^7 treeChopDeath event received - Forest: " .. forestId .. ", TreeIndex: " .. treeIndex)
+    print("^2[DEBUG]^7 GroveRegistry size: " .. #GroveRegistry)
+    
     -- Find and delete the tree entity
+    local foundAndDeleted = false
     for i = #GroveRegistry, 1, -1 do
-        if GroveRegistry[i].forestId == forestId and GroveRegistry[i].treeIndex == treeIndex and not GroveRegistry[i].isStump then
-            if DoesEntityExist(GroveRegistry[i].entity) then
-                DeleteEntity(GroveRegistry[i].entity)
+        local node = GroveRegistry[i]
+        print(string.format("^2[DEBUG]^7 Checking registry entry %d: forestId=%s treeIndex=%s isStump=%s", 
+            i, tostring(node.forestId), tostring(node.treeIndex), tostring(node.isStump)))
+        
+        if node.forestId == forestId and node.treeIndex == treeIndex and not node.isStump then
+            print("^2[DEBUG]^7 Found matching tree at index " .. i .. ", attempting to delete entity")
+            if DoesEntityExist(node.entity) then
+                print("^2[DEBUG]^7 Entity exists, deleting...")
+                DeleteEntity(node.entity)
+                foundAndDeleted = true
+            else
+                print("^1[DEBUG]^7 Entity does NOT exist!")
             end
             table.remove(GroveRegistry, i)
             break
         end
     end
 
+    if not foundAndDeleted then
+        print("^1[DEBUG]^7 NO MATCHING TREE FOUND IN REGISTRY!")
+    end
+
     -- Spawn stump
+    print("^2[DEBUG]^7 Attempting to spawn stump with nodeData: x=" .. nodeData.x .. " y=" .. nodeData.y .. " z=" .. nodeData.z)
     SpawnLocalTree(nodeData, forestId, treeIndex, true)
     print("^3[Atlas Woodcutting]^7 Tree " .. treeIndex .. " in forest " .. forestId .. " chopped, stump spawned")
 end)
