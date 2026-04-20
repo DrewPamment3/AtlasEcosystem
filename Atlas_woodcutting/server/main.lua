@@ -118,12 +118,8 @@ AddEventHandler('atlas_woodcutting:server:saveNode', function(forestId, coords, 
                 local node = { x = coords.x, y = coords.y, z = coords.z, model_name = modelName, forest_id = forestId }
                 table.insert(GlobalNodes, node)
 
-                -- Broadcast to all clients tracking this forest
-                if ForestClients[forestId] then
-                    for clientId, _ in pairs(ForestClients[forestId]) do
-                        TriggerClientEvent('atlas_woodcutting:client:spawnSingleNode', clientId, node, forestId)
-                    end
-                end
+                -- Broadcast to all clients (they'll spawn if they're tracking this forest)
+                TriggerClientEvent('atlas_woodcutting:client:spawnSingleNode', -1, node, forestId)
             else
                 print("^1[Atlas Woodcutting]^7 Failed to save node for forest " .. forestId)
             end
@@ -189,6 +185,78 @@ RegisterCommand('checkgroup', function(source, args)
         end)
 
     VORPcore.NotifyRightTip(_source, "^3Checking group from database...", 4000)
+end)
+
+--- DEBUG: Spawn tree model in front of player with custom Z offset
+RegisterCommand('spawntree', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /spawntree is for in-game players only")
+        return
+    end
+
+    if not args[1] then
+        VORPcore.NotifyRightTip(_source, "~r~Usage: /spawntree [model] [zOffset]", 4000)
+        return
+    end
+
+    local modelName = args[1]
+    local zOffset = args[2] and tonumber(args[2]) or 0.2
+
+    if not zOffset or zOffset < 0 then
+        zOffset = 0.2
+    end
+
+    local ped = GetPlayerPed(_source)
+    if ped == 0 then
+        VORPcore.NotifyRightTip(_source, "~r~Error getting player", 4000)
+        return
+    end
+
+    local pCoords = GetEntityCoords(ped)
+    local pForward = GetEntityForwardVector(ped)
+
+    -- Spawn 3 meters in front of player
+    local spawnX = pCoords.x + (pForward.x * 3)
+    local spawnY = pCoords.y + (pForward.y * 3)
+    local spawnZ = pCoords.z
+
+    -- Get ground Z
+    local found, groundZ = GetGroundZFor_3dCoord(spawnX, spawnY, 1000.0)
+    if found then
+        spawnZ = groundZ - zOffset
+    end
+
+    -- Load and spawn model
+    local modelHash = GetHashKey(modelName)
+    if not IsModelValid(modelHash) then
+        VORPcore.NotifyRightTip(_source, "~r~Invalid model: " .. modelName, 4000)
+        print("^1[Atlas Debug]^7 Invalid model: " .. modelName)
+        return
+    end
+
+    if not HasModelLoaded(modelHash) then
+        RequestModel(modelHash)
+        local timeout = GetGameTimer() + 5000
+        while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do
+            Citizen.Wait(1)
+        end
+
+        if not HasModelLoaded(modelHash) then
+            VORPcore.NotifyRightTip(_source, "~r~Failed to load model within timeout", 4000)
+            print("^1[Atlas Debug]^7 Failed to load model " .. modelName .. " within timeout")
+            return
+        end
+    end
+
+    local tree = CreateObject(modelHash, spawnX, spawnY, spawnZ, false, false, false)
+    SetEntityRotation(tree, 0.0, 0.0, 0.0, 2, true)
+    FreezeEntityPosition(tree, true)
+    SetEntityAsMissionEntity(tree, true, true)
+    SetModelAsNoLongerNeeded(modelHash)
+
+    VORPcore.NotifyRightTip(_source, "^2Spawned " .. modelName .. " with Z offset: " .. zOffset, 4000)
+    print("^2[Atlas Debug]^7 Spawned " .. modelName .. " at (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
 end)
 
 RegisterCommand('createforest', function(source, args)

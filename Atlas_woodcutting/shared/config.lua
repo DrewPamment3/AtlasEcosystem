@@ -55,3 +55,18 @@ AtlasWoodConfig.Trees = {
     [1998592543] = { name = "Oak", xp = 40 },
     [1771086077] = { name = "Large Pine", xp = 30 },
 }
+
+-- Tree Model Z-Offsets (subtract from ground Z to properly position trees)
+-- Use /spawntree [model] [zOffset] to test and find correct values
+AtlasWoodConfig.TreeModelZOffsets = {
+    ["p_tree_longleafpine_02"] = 0.2,      -- Default offset
+    ["p_tree_blue_oak_01"] = 0.2,          -- Placeholder - test with /spawntree
+    ["p_tree_oak01x"] = 0.2,
+    ["p_tree_pine01x"] = 0.2,
+    ["p_pine_01"] = 0.2,
+}
+
+-- Function to get Z offset for a model (returns default 0.2 if not found)
+function AtlasWoodConfig.GetTreeZOffset(modelName)
+    return AtlasWoodConfig.TreeModelZOffsets[modelName] or 0.2
+end

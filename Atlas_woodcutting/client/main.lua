@@ -40,7 +40,8 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     end
 
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
-    local tree = CreateObject(modelHash, node.x, node.y, groundZ - 0.2, false, false, false)
+    local zOffset = AtlasWoodConfig.GetTreeZOffset(modelName)
+    local tree = CreateObject(modelHash, node.x, node.y, groundZ - zOffset, false, false, false)
     SetEntityRotation(tree, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
