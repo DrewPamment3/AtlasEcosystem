@@ -156,6 +156,42 @@ end)
 
 ---
 
+## 12. Client-Side RegisterCommand Args Format
+**Mistake:** Assuming client-side `RegisterCommand` receives `args` as a table
+- ❌ **Server-side**: `RegisterCommand(name, function(source, args)` - `args` is a table `{arg1, arg2, ...}`
+- ❌ **Client-side**: `RegisterCommand(name, function(args)` - `args` is a **STRING** `"arg1 arg2 arg3"`
+- ❌ Directly accessing `args[1]` crashes with "attempt to index a number value"
+
+**Correct Approach:**
+- ✅ Parse the string on client-side:
+  ```lua
+  RegisterCommand('mycommand', function(args)
+      local arguments = {}
+      for match in string.gmatch(args, "%S+") do
+          table.insert(arguments, match)
+      end
+      
+      local arg1 = arguments[1]  -- Now safe to access
+      local arg2 = arguments[2]
+  end)
+  ```
+- ✅ Or use helper function:
+  ```lua
+  local function parseArgs(argString)
+      local result = {}
+      for match in string.gmatch(argString, "%S+") do
+          table.insert(result, match)
+      end
+      return result
+  end
+  ```
+
+**Key Difference:**
+- Server: Args come pre-parsed as table from command handler
+- Client: Args come as raw string that needs manual parsing
+
+---
+
 ## Quick Checklist Before Submitting Code
 - [ ] Are you using valid RedM API functions? (Test in RedM docs)
 - [ ] Did you check for nil before accessing properties?
@@ -166,3 +202,4 @@ end)
 - [ ] Did you account for async callback execution?
 - [ ] Are client-only natives (CreateObject, GetGameTimer, etc) only in CLIENT files?
 - [ ] Is your server-side RegisterCommand only doing server logic, not game manipulation?
+- [ ] If using client-side RegisterCommand, are you parsing STRING args, not treating as table?

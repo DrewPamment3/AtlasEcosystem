@@ -117,7 +117,13 @@ end)
 
 --- DEBUG: Spawn tree model in front of player with custom Z offset
 RegisterCommand('spawntree', function(args)
-    if not args[1] then
+    -- Client-side commands receive args as a STRING, need to parse it
+    local arguments = {}
+    for match in string.gmatch(args, "%S+") do
+        table.insert(arguments, match)
+    end
+    
+    if not arguments[1] then
         TriggerEvent('chat:addMessage', {
             color = {255, 0, 0},
             multiline = true,
@@ -126,8 +132,8 @@ RegisterCommand('spawntree', function(args)
         return
     end
 
-    local modelName = args[1]
-    local zOffset = args[2] and tonumber(args[2]) or 0.2
+    local modelName = arguments[1]
+    local zOffset = arguments[2] and tonumber(arguments[2]) or 0.2
 
     if not zOffset or zOffset < 0 then
         zOffset = 0.2
