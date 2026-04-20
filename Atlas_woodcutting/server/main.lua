@@ -104,6 +104,15 @@ AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     if ped == 0 then return end
     
     local playerCoords = GetEntityCoords(ped)
+    local closestForests = SubscribePlayerToForests(_source, playerCoords)
+
+    -- Send initial forest state to client
+    TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
+end)
+
+RegisterServerEvent('atlas_woodcutting:server:saveNode')
+AddEventHandler('atlas_woodcutting:server:saveNode', function(forestId, coords, modelName)
+    exports.oxmysql:insert('INSERT INTO atlas_woodcutting_nodes (forest_id, x, y, z, model_name) VALUES (?, ?, ?, ?, ?)',
         { forestId, coords.x, coords.y, coords.z, modelName }, function(id)
             if id then
                 local node = { x = coords.x, y = coords.y, z = coords.z, model_name = modelName, forest_id = forestId }
