@@ -47,23 +47,23 @@ RegisterCommand('checkgroup', function(source, args)
         return
     end
 
-    local character = user.getUsedCharacter()
+    local character = user.getUsedCharacter
     local groupStatus = user.group or "user"
     local charGroup = character and character.group or "unknown"
     local userIdentifier = user.identifier or "unknown"
 
     -- Query database directly to verify
-    exports.oxmysql:execute('SELECT `group` FROM characters WHERE charidentifier = ?', 
-        { character and character.charIdentifier or "unknown" }, 
+    exports.oxmysql:execute('SELECT `group` FROM characters WHERE charidentifier = ?',
+        { character and character.charIdentifier or "unknown" },
         function(result)
             local dbCharGroup = (result and result[1] and result[1].group) or "NOT FOUND"
-            
+
             -- Also check users table
-            exports.oxmysql:execute('SELECT `group` FROM users WHERE identifier = ?', 
-                { userIdentifier }, 
+            exports.oxmysql:execute('SELECT `group` FROM users WHERE identifier = ?',
+                { userIdentifier },
                 function(userResult)
                     local dbUserGroup = (userResult and userResult[1] and userResult[1].group) or "NOT FOUND"
-                    
+
                     print("^2================================================^7")
                     print(string.format("^3Advanced Group Check for ID %d^7", _source))
                     print("^2================================================^7")
@@ -77,12 +77,14 @@ RegisterCommand('checkgroup', function(source, args)
                     print(string.format("  ^7User: ^6%s^7", userIdentifier))
                     print(string.format("  ^7Character ID: ^6%s^7", character and character.charIdentifier or "unknown"))
                     print("^2================================================^7")
-                    
+
                     if dbCharGroup ~= groupStatus then
-                        print("^1⚠️  MISMATCH!^7 Database shows '" .. dbCharGroup .. "' but VORP shows '" .. groupStatus .. "'")
+                        print("^1⚠️  MISMATCH!^7 Database shows '" ..
+                        dbCharGroup .. "' but VORP shows '" .. groupStatus .. "'")
                     end
                     if dbUserGroup ~= groupStatus then
-                        print("^1⚠️  MISMATCH!^7 Users table shows '" .. dbUserGroup .. "' but VORP shows '" .. groupStatus .. "'")
+                        print("^1⚠️  MISMATCH!^7 Users table shows '" ..
+                        dbUserGroup .. "' but VORP shows '" .. groupStatus .. "'")
                     end
                     print("^2================================================^7")
                 end)
