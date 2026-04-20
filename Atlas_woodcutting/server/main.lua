@@ -36,7 +36,7 @@ RegisterCommand('createforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.group ~= 'admin' then
-        VORPcore.NotifyTiny(_source, "Admin only command", "~r~Error", "right")
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
     local pCoords = GetEntityCoords(GetPlayerPed(_source))
@@ -45,30 +45,26 @@ RegisterCommand('createforest', function(source, args)
 
     -- Validate parameters against config ranges
     if radius < Config.RadiusRange.min or radius > Config.RadiusRange.max then
-        VORPcore.NotifyTiny(_source, "Radius must be " .. Config.RadiusRange.min .. "-" .. Config.RadiusRange.max,
-            "~r~Invalid", "right")
+        VORPcore.NotifyRightTip(_source, "~r~Radius must be " .. Config.RadiusRange.min .. "-" .. Config.RadiusRange.max, 4000)
         return
     end
     if count < Config.TreeCountRange.min or count > Config.TreeCountRange.max then
-        VORPcore.NotifyTiny(_source, "Count must be " .. Config.TreeCountRange.min .. "-" .. Config.TreeCountRange.max,
-            "~r~Invalid", "right")
+        VORPcore.NotifyRightTip(_source, "~r~Count must be " .. Config.TreeCountRange.min .. "-" .. Config.TreeCountRange.max, 4000)
         return
     end
     if tier < Config.TierRange.min or tier > Config.TierRange.max then
-        VORPcore.NotifyTiny(_source, "Tier must be " .. Config.TierRange.min .. "-" .. Config.TierRange.max, "~r~Invalid",
-            "right")
+        VORPcore.NotifyRightTip(_source, "~r~Tier must be " .. Config.TierRange.min .. "-" .. Config.TierRange.max, 4000)
         return
     end
     exports.oxmysql:insert(
         'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, tier, model_name, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, model, name }, function(fId)
             if fId then
-                VORPcore.NotifyTiny(_source, "Forest '" .. name .. "' created with " .. count .. " trees", "~g~Success",
-                    "right")
+                VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
                 TriggerClientEvent('atlas_woodcutting:client:generateForestNodes', _source, fId, pCoords, radius, count,
                     model)
             else
-                VORPcore.NotifyTiny(_source, "Failed to create forest in database", "~r~Error", "right")
+                VORPcore.NotifyRightTip(_source, "~r~Failed to create forest in database", 4000)
                 print("^1[Atlas Woodcutting]^7 Failed to insert forest for admin " .. _source)
             end
         end)
@@ -78,11 +74,14 @@ RegisterCommand('wipeforest', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.group ~= 'admin' then
-        VORPcore.NotifyTiny(_source, "Admin only command", "~r~Error", "right")
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
     local targetName = args[1]
-    if not targetName then return end
+    if not targetName then
+        VORPcore.NotifyRightTip(_source, "~r~Usage: /wipeforest [forestname]", 4000)
+        return
+    end
     exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE name = ?', { targetName }, function(result)
         if result and result[1] and result[1].id then
             local fId = result[1].id
@@ -92,9 +91,9 @@ RegisterCommand('wipeforest', function(source, args)
                 if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
             end
             TriggerClientEvent('atlas_woodcutting:client:wipeSpecificForest', -1, fId)
-            VORPcore.NotifyTiny(_source, "Forest '" .. targetName .. "' wiped successfully", "~g~Success", "right")
+            VORPcore.NotifyRightTip(_source, "~g~Forest '" .. targetName .. "' wiped successfully", 4000)
         else
-            VORPcore.NotifyTiny(_source, "Forest '" .. targetName .. "' not found", "~r~Error", "right")
+            VORPcore.NotifyRightTip(_source, "~r~Forest '" .. targetName .. "' not found", 4000)
         end
     end)
 end)
@@ -103,7 +102,7 @@ RegisterCommand('listforests', function(source, args)
     local _source = source
     local user = VORPcore.getUser(_source)
     if not user or user.group ~= 'admin' then
-        VORPcore.NotifyTiny(_source, "Admin only command", "~r~Error", "right")
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
         return
     end
     
