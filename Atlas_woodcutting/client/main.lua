@@ -325,12 +325,135 @@ AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, ce
     end
 end)
 
+-- Helper: Try to load and play animation from dictionary
+local function PlayChopAnimation(ped, animData)
+    if not animData then
+        print("^1[Atlas Woodcutting]^7 No animation data provided")
+        return false
+    end
+
+    local dict = animData.dict
+    local anim = animData.anim
+    local timeout = GetGameTimer() + 5000
+
+    -- Try to load animation dictionary
+    if not HasAnimDictLoaded(dict) then
+        RequestAnimDict(dict)
+        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+
+    if not HasAnimDictLoaded(dict) then
+        print("^1[Atlas Woodcutting]^7 Failed to load animation dict: " .. dict)
+        return false
+    end
+
+    -- Play animation
+    TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 1, 0, false, false, false)
+    print("^2[Atlas Woodcutting]^7 Playing animation: " .. dict .. " > " .. anim)
+    return true
+end
+
+-- Helper: Monitor for chopping interrupts (health drop or movement)
+local function MonitorChoppingInterrupts(ped, token, duration)
+    local startTime = GetGameTimer()
+    local startHealth = GetEntityHealth(ped)
+    local interrupted = false
+    local interruptReason = ""
+
+    while GetGameTimer() - startTime < duration do
+        -- Check if player is dead
+        if IsEntityDead(ped) then
+            interrupted = true
+            interruptReason = "Player died during chop"
+            break
+        end
+
+        -- Check for health drop (damage or hunger)
+        local currentHealth = GetEntityHealth(ped)
+        if currentHealth < startHealth and AtlasWoodConfig.DetectHealthDrop then
+            interrupted = true
+            interruptReason = "Health dropped (damage/hunger)"
+            break
+        end
+
+        -- Check for movement input (WASD)
+        if AtlasWoodConfig.DetectMovement then
+            -- W key = 32, A key = 33, S key = 35, D key = 34 (disabled spacebar = 32)
+            if IsControlPressed(0, 32) or IsControlPressed(0, 33) or IsControlPressed(0, 34) or IsControlPressed(0, 35) then
+                interrupted = true
+                interruptReason = "Player moved during chop"
+                break
+            end
+        end
+
+        Citizen.Wait(100)
+    end
+
+    return interrupted, interruptReason
+end
+
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     isBusy = true
-    TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
-    Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
-    ClearPedTasks(PlayerPedId())
-    isBusy = false
-    TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
+    local ped = PlayerPedId()
+    local interrupted = false
+    local interruptReason = "Unknown"
+
+    -- Try to find and load animation dictionary
+    local animData = nil
+    for _, data in ipairs(AtlasWoodConfig.ChopAnimations) do
+        if HasAnimDictLoaded(data.dict) then
+            animData = data
+            break
+        end
+    end
+
+    -- Try loading dictionaries if not already loaded
+    if not animData then
+        for _, data in ipairs(AtlasWoodConfig.ChopAnimations) do
+            RequestAnimDict(data.dict)
+            local checkTimeout = GetGameTimer() + 2000
+            while not HasAnimDictLoaded(data.dict) and GetGameTimer() < checkTimeout do
+                Citizen.Wait(1)
+            end
+            if HasAnimDictLoaded(data.dict) then
+                animData = data
+                break
+            end
+        end
+    end
+
+    -- If animation loaded successfully, play it and monitor for interrupts
+    if animData then
+        if PlayChopAnimation(ped, animData) then
+            interrupted, interruptReason = MonitorChoppingInterrupts(ped, token, AtlasWoodConfig.ChopAnimationTime)
+        end
+    else
+        -- Fallback to scenario if no animation dict available
+        if AtlasWoodConfig.UseScenarioFallback then
+            print("^3[Atlas Woodcutting]^7 No animation dictionary found, using scenario fallback")
+            TaskStartScenarioInPlace(ped, `WORLD_HUMAN_TREE_CHOP`, -1, true)
+            interrupted, interruptReason = MonitorChoppingInterrupts(ped, token, AtlasWoodConfig.ChopAnimationTime)
+        else
+            print("^1[Atlas Woodcutting]^7 No animation available and fallback disabled")
+            isBusy = false
+            return
+        end
+    end
+
+    -- Always clear animation/scenario tasks
+    ClearPedTasks(ped)
+
+    -- Handle result
+    if interrupted then
+        print("^3[Atlas Woodcutting]^7 Chop interrupted: " .. interruptReason)
+        isBusy = false
+        TriggerServerEvent('atlas_woodcutting:server:chopAborted', token)
+    else
+        print("^2[Atlas Woodcutting]^7 Chop completed successfully")
+        isBusy = false
+        TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
+    end
 end)

@@ -6,6 +6,21 @@ AtlasWoodConfig.InteractionKey = 0x760A9C6F -- G key (0x760A9C6F)
 AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation
 AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds
 
+-- Animation Configuration (Try these in order, falls back to scenario if none available)
+AtlasWoodConfig.ChopAnimations = {
+    -- Candidate animations to try (add more as you discover them)
+    -- Format: { dict = "dictionary_name", anim = "animation_name", duration = milliseconds }
+    { dict = "combat@damage@rb_writhe", anim = "rb_writhe_loop", duration = 5000 },
+    { dict = "melee@scratching", anim = "scratching_ground", duration = 5000 },
+    { dict = "misscompstat@idle", anim = "base_idle", duration = 5000 },
+}
+AtlasWoodConfig.UseScenarioFallback = true -- If no animation dict available, use WORLD_HUMAN_TREE_CHOP scenario
+
+-- Interrupt Detection
+AtlasWoodConfig.DetectHealthDrop = true     -- Cancel chop if player health drops
+AtlasWoodConfig.DetectMovement = true       -- Cancel chop if player presses WASD/movement
+AtlasWoodConfig.MovementKeys = { 32, 33, 34, 35 } -- Space(32), W(33), A(34), S(35), D(36) - RedM keycodes
+
 -- Distance & Rendering
 AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
 AtlasWoodConfig.RespawnMinutesPerTier = 20 -- Base respawn time (doubled per tier level)
@@ -69,4 +84,17 @@ AtlasWoodConfig.TreeModelZOffsets = {
 -- Function to get Z offset for a model (returns default 0.2 if not found)
 function AtlasWoodConfig.GetTreeZOffset(modelName)
     return AtlasWoodConfig.TreeModelZOffsets[modelName] or 0.2
+end
+
+-- Function to try loading animation dictionaries and return first available (CLIENT-ONLY)
+-- Returns: {dict=string, anim=string} or nil if none available
+function AtlasWoodConfig.GetAvailableAnimation()
+    if not IsDuplicityVersion() then -- Only run on client
+        for _, animData in ipairs(AtlasWoodConfig.ChopAnimations) do
+            if HasAnimDictLoaded(animData.dict) or GetHashKey(animData.dict) then
+                return animData
+            end
+        end
+    end
+    return nil
 end

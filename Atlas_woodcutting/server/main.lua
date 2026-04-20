@@ -443,6 +443,18 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     ActiveTasks[_source] = nil
 end)
 
+RegisterServerEvent('atlas_woodcutting:server:chopAborted')
+AddEventHandler('atlas_woodcutting:server:chopAborted', function(token)
+    local _source = source
+    local task = ActiveTasks[_source]
+    if not task or task.token ~= token then return end
+
+    -- Simply clear the task, no tree is marked as dead
+    print("^3[Atlas Woodcutting]^7 Chop aborted for player " .. _source .. " (token: " .. token .. ")")
+    VORPcore.NotifyRightTip(_source, "~r~Chop interrupted. Movement detected.", 3000)
+    ActiveTasks[_source] = nil
+end)
+
 -- Player Disconnect Cleanup
 AddEventHandler('playerDropped', function(reason)
     local _source = source
