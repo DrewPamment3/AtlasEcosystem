@@ -102,40 +102,18 @@ end
 RegisterServerEvent('atlas_woodcutting:server:playerLoaded')
 AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     local _source = source
-    print("^2[PLAYER LOAD DEBUG]^7 playerLoaded triggered for source " .. _source)
-    
     local user = VORPcore.getUser(_source)
-    if not user then 
-        print("^1[PLAYER LOAD DEBUG]^7 User is nil")
-        return 
-    end
+    if not user then return end
 
     local character = user.getUsedCharacter
-    if not character then 
-        print("^1[PLAYER LOAD DEBUG]^7 Character is nil")
-        return 
-    end
+    if not character then return end
 
     -- Get player position from player ped (standard RedM approach)
     local ped = GetPlayerPed(_source)
-    if ped == 0 then 
-        print("^1[PLAYER LOAD DEBUG]^7 Ped is 0 (not spawned yet)")
-        return 
-    end
-    
-    print("^2[PLAYER LOAD DEBUG]^7 Ped ID: " .. tostring(ped))
+    if ped == 0 then return end
 
     local playerCoords = GetEntityCoords(ped)
-    print(string.format("^2[PLAYER LOAD DEBUG]^7 Player coords: %.2f, %.2f, %.2f", playerCoords.x, playerCoords.y, playerCoords.z))
-    
-    print("^2[PLAYER LOAD DEBUG]^7 Total forests in GlobalForests: " .. #GlobalForests)
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
-    print("^2[PLAYER LOAD DEBUG]^7 Found " .. #closestForests .. " forests in range")
-    
-    -- Debug: show ForestClients status AFTER subscription
-    for fId, clients in pairs(ForestClients) do
-        print(string.format("^2[PLAYER LOAD DEBUG]^7 ForestClients[%d] = %d clients", fId, CountTable(clients)))
-    end
 
     -- Send initial forest state to client
     TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
@@ -441,17 +419,12 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
 
     local chopTime = os.time()
     ForestTreeStates[forestId][treeIndex] = chopTime
-    print("^2[SERVER DEBUG]^7 Marked forest " .. forestId .. " tree " .. treeIndex .. " as dead")
 
     -- Notify all clients tracking this forest about the dead tree
     if ForestClients[forestId] then
-        print("^2[SERVER DEBUG]^7 Found " .. CountTable(ForestClients[forestId]) .. " subscribed clients for forest " .. forestId)
         for clientId, _ in pairs(ForestClients[forestId]) do
-            print("^2[SERVER DEBUG]^7 Sending treeChopDeath to client " .. clientId)
             TriggerClientEvent('atlas_woodcutting:client:treeChopDeath', clientId, forestId, treeIndex, nodeData)
         end
-    else
-        print("^1[SERVER DEBUG]^7 NO SUBSCRIBED CLIENTS for forest " .. forestId .. "!")
     end
 
     -- Schedule respawn timer

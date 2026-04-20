@@ -25,7 +25,6 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     isStump = isStump or false
     local modelName = isStump and "p_stump" or node.model_name
     local modelHash = GetHashKey(modelName)
-    print(string.format("^2[SPAWN DEBUG]^7 Spawning isStump=%s | Model=%s", tostring(isStump), modelName))
 
     if not HasModelLoaded(modelHash) then
         RequestModel(modelHash)
@@ -39,17 +38,15 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
             return
         end
     end
-    print("^2[SPAWN DEBUG]^7 Model loaded: " .. modelName)
 
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
     local zOffset = AtlasWoodConfig.GetTreeZOffset(modelName)
     local tree = CreateObject(modelHash, node.x, node.y, groundZ - zOffset, false, false, false)
     
     if tree == 0 then
-        print("^1[SPAWN DEBUG]^7 ERROR: CreateObject failed for " .. modelName)
+        print("^1[Atlas Woodcutting]^7 ERROR: CreateObject failed for " .. modelName)
         return
     end
-    print("^2[SPAWN DEBUG]^7 Created entity: " .. tostring(tree))
     
     SetEntityRotation(tree, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(tree, true)
@@ -318,6 +315,14 @@ end)
 Citizen.CreateThread(function()
     Citizen.Wait(5000)
     TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
+end)
+
+-- Periodic re-subscription: update player's forest subscriptions every 10 seconds
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(10000) -- Check every 10 seconds
+        TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
+    end
 end)
 
 RegisterNetEvent('atlas_woodcutting:client:generateForestNodes')
