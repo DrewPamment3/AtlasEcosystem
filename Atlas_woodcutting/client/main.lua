@@ -341,10 +341,21 @@ end)
 
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
+    print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
+    print("^2[CHOP FLOW]^7 Setting isBusy = true")
     isBusy = true
+    
+    print("^2[CHOP FLOW]^7 Starting scenario: WORLD_HUMAN_TREE_CHOP")
     TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
+    
+    print("^2[CHOP FLOW]^7 Waiting " .. AtlasWoodConfig.ChopAnimationTime .. "ms for animation")
     Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
+    
+    print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
     ClearPedTasks(PlayerPedId())
+    
+    print("^2[CHOP FLOW]^7 Setting isBusy = false, sending finishChop to server")
     isBusy = false
     TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
+    print("^2[CHOP FLOW]^7 finishChop event sent")
 end)

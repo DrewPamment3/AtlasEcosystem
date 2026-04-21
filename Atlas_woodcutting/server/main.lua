@@ -135,7 +135,8 @@ AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
 
     local playerCoords = GetEntityCoords(ped)
     -- Just update subscriptions, don't send full loadForests event
-    SubscribePlayerToForests(_source, playerCoords)
+    local closestForests = SubscribePlayerToForests(_source, playerCoords)
+    print("^3[SUBSCRIPTIONS]^7 Updated player " .. _source .. " subscriptions - " .. #closestForests .. " forests in range")
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:saveNode')
@@ -402,6 +403,8 @@ end)
 RegisterServerEvent('atlas_woodcutting:server:requestStart')
 AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forestId, treeIndex, nodeData)
     local _source = source
+    print("^2[CHOP FLOW]^7 requestStart [SERVER] - Player " .. _source .. " | Forest " .. forestId .. " | Tree " .. treeIndex)
+    
     local token = "CHOP_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
         token = token,
@@ -410,18 +413,30 @@ AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forest
         treeIndex = treeIndex,
         nodeData = nodeData
     }
+    print("^2[CHOP FLOW]^7 Token created: " .. token)
+    print("^2[CHOP FLOW]^7 Sending beginMinigame to client " .. _source)
     TriggerClientEvent('atlas_woodcutting:client:beginMinigame', _source, token)
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:finishChop')
 AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local _source = source
+    print("^2[CHOP FLOW]^7 finishChop [SERVER] - Player " .. _source .. " | Token: " .. token)
+    
     local task = ActiveTasks[_source]
-    if not task or task.token ~= token then return end
+    if not task or task.token ~= token then
+        if not task then
+            print("^1[CHOP FLOW]^7 ERROR: No active task for player " .. _source)
+        else
+            print("^1[CHOP FLOW]^7 ERROR: Token mismatch!")
+        end
+        return
+    end
 
     local forestId = task.forestId
     local treeIndex = task.treeIndex
     local nodeData = task.nodeData
+    print("^2[CHOP FLOW]^7 Marking tree dead - Forest " .. forestId .. " | Tree " .. treeIndex)
 
     local success, result = pcall(function()
         return exports.Atlas_skilling:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
