@@ -453,12 +453,19 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
 
     local chopTime = os.time()
     ForestTreeStates[forestId][treeIndex] = chopTime
+    print("^2[CHOP FLOW]^7 ForestTreeStates updated, checking subscriptions...")
 
     -- Notify all clients tracking this forest about the dead tree
+    print("^2[CHOP FLOW]^7 Looking for ForestClients[" .. forestId .. "]")
     if ForestClients[forestId] then
+        local clientCount = CountTable(ForestClients[forestId])
+        print("^2[CHOP FLOW]^7 Found " .. clientCount .. " subscribed clients for forest " .. forestId)
         for clientId, _ in pairs(ForestClients[forestId]) do
+            print("^2[CHOP FLOW]^7 Sending treeChopDeath to client " .. clientId)
             TriggerClientEvent('atlas_woodcutting:client:treeChopDeath', clientId, forestId, treeIndex, nodeData)
         end
+    else
+        print("^1[CHOP FLOW]^7 ERROR: NO SUBSCRIBED CLIENTS for forest " .. forestId)
     end
 
     -- Schedule respawn timer

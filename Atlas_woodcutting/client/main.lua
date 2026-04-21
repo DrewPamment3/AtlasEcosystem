@@ -238,15 +238,26 @@ end)
 
 RegisterNetEvent('atlas_woodcutting:client:treeChopDeath')
 AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, treeIndex, nodeData)
+    print("^2[CHOP FLOW]^7 treeChopDeath [CLIENT] received - Forest " .. forestId .. " | Tree " .. treeIndex)
+    print("^2[CHOP FLOW]^7 GroveRegistry size: " .. #GroveRegistry)
+    
     -- Find and delete the tree entity
+    local found = false
     for i = #GroveRegistry, 1, -1 do
-        if GroveRegistry[i].forestId == forestId and GroveRegistry[i].treeIndex == treeIndex and not GroveRegistry[i].isStump then
-            if DoesEntityExist(GroveRegistry[i].entity) then
-                DeleteEntity(GroveRegistry[i].entity)
+        local node = GroveRegistry[i]
+        if node.forestId == forestId and node.treeIndex == treeIndex and not node.isStump then
+            print("^2[CHOP FLOW]^7 Found matching tree at index " .. i .. ", deleting entity " .. tostring(node.entity))
+            if DoesEntityExist(node.entity) then
+                DeleteEntity(node.entity)
+                found = true
             end
             table.remove(GroveRegistry, i)
             break
         end
+    end
+    
+    if not found then
+        print("^1[CHOP FLOW]^7 ERROR: No matching tree found in registry!")
     end
 
     -- Spawn stump
