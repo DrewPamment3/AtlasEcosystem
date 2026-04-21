@@ -58,11 +58,16 @@ end
 
 -- Helper: Subscribe player to nearby forests
 local function SubscribePlayerToForests(playerId, playerCoords)
+    print(string.format("^3[SUBSCRIBE DEBUG]^7 SubscribePlayerToForests called - Player %d at (%.1f, %.1f, %.1f)", playerId, playerCoords.x, playerCoords.y, playerCoords.z))
+    print("^3[SUBSCRIBE DEBUG]^7 GlobalForests has " .. #GlobalForests .. " forests")
+    
     local closestForests = {}
 
     for _, forest in ipairs(GlobalForests) do
         local distance = GetDistance(playerCoords.x, playerCoords.y, playerCoords.z, forest.x, forest.y, forest.z)
+        print(string.format("^3[SUBSCRIBE DEBUG]^7 Forest %d at (%.1f, %.1f, %.1f) - distance: %.1f meters", forest.id, forest.x, forest.y, forest.z, distance))
         if distance <= Config.RenderDistance then
+            print("^2[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " IS IN RANGE")
             table.insert(closestForests, {
                 id = forest.id,
                 x = forest.x,
@@ -71,10 +76,15 @@ local function SubscribePlayerToForests(playerId, playerCoords)
                 distance = distance,
                 tier = forest.tier
             })
+        else
+            print("^3[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " is out of range")
         end
     end
 
-    -- Update ForestClients tracking
+    print("^3[SUBSCRIBE DEBUG]^7 Player will be subscribed to " .. #closestForests .. " forests")
+
+    -- Update ForestClients tracking - REMOVE from dead forests
+    print("^3[SUBSCRIBE DEBUG]^7 Checking existing subscriptions...")
     for forestId, _ in pairs(ForestClients) do
         local stillInRange = false
         for _, forest in ipairs(closestForests) do
@@ -85,15 +95,25 @@ local function SubscribePlayerToForests(playerId, playerCoords)
         end
 
         if not stillInRange and ForestClients[forestId] then
+            print("^1[SUBSCRIBE DEBUG]^7 Removing player " .. playerId .. " from forest " .. forestId .. " (out of range)")
             ForestClients[forestId][playerId] = nil
         end
     end
 
+    -- ADD to new forests
+    print("^3[SUBSCRIBE DEBUG]^7 Adding to new forests...")
     for _, forest in ipairs(closestForests) do
         if not ForestClients[forest.id] then
+            print("^2[SUBSCRIBE DEBUG]^7 Creating ForestClients[" .. forest.id .. "]")
             ForestClients[forest.id] = {}
         end
+        print("^2[SUBSCRIBE DEBUG]^7 Adding player " .. playerId .. " to forest " .. forest.id)
         ForestClients[forest.id][playerId] = true
+    end
+
+    print("^2[SUBSCRIBE DEBUG]^7 Final ForestClients state:")
+    for fId, clients in pairs(ForestClients) do
+        print("  Forest " .. fId .. ": " .. CountTable(clients) .. " clients")
     end
 
     return closestForests
