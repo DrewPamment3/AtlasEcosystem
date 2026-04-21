@@ -42,12 +42,12 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
     local zOffset = AtlasWoodConfig.GetTreeZOffset(modelName)
     local tree = CreateObject(modelHash, node.x, node.y, groundZ - zOffset, false, false, false)
-    
+
     if tree == 0 then
         print("^1[Atlas Woodcutting]^7 ERROR: CreateObject failed for " .. modelName)
         return
     end
-    
+
     SetEntityRotation(tree, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(tree, true)
     SetEntityAsMissionEntity(tree, true, true)
@@ -240,7 +240,7 @@ RegisterNetEvent('atlas_woodcutting:client:treeChopDeath')
 AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, treeIndex, nodeData)
     print("^2[CHOP FLOW]^7 treeChopDeath [CLIENT] received - Forest " .. forestId .. " | Tree " .. treeIndex)
     print("^2[CHOP FLOW]^7 GroveRegistry size: " .. #GroveRegistry)
-    
+
     -- Find and delete the tree entity
     local found = false
     for i = #GroveRegistry, 1, -1 do
@@ -255,7 +255,7 @@ AddEventHandler('atlas_woodcutting:client:treeChopDeath', function(forestId, tre
             break
         end
     end
-    
+
     if not found then
         print("^1[CHOP FLOW]^7 ERROR: No matching tree found in registry!")
     end
@@ -355,16 +355,16 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
     print("^2[CHOP FLOW]^7 Setting isBusy = true")
     isBusy = true
-    
+
     print("^2[CHOP FLOW]^7 Starting scenario: WORLD_HUMAN_TREE_CHOP")
     TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
-    
+
     print("^2[CHOP FLOW]^7 Waiting " .. AtlasWoodConfig.ChopAnimationTime .. "ms for animation")
     Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
-    
+
     print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
     ClearPedTasks(PlayerPedId())
-    
+
     print("^2[CHOP FLOW]^7 Setting isBusy = false, sending finishChop to server")
     isBusy = false
     TriggerServerEvent('atlas_woodcutting:server:finishChop', token)

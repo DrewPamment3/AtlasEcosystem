@@ -47,7 +47,7 @@ local function GetDistance(x1, y1, z1, x2, y2, z2)
     return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2 + (z2 - z1) ^ 2)
 end
 
--- Helper: Count table entries  
+-- Helper: Count table entries
 local function CountTable(t)
     local count = 0
     for _ in pairs(t) do
@@ -58,14 +58,16 @@ end
 
 -- Helper: Subscribe player to nearby forests
 local function SubscribePlayerToForests(playerId, playerCoords)
-    print(string.format("^3[SUBSCRIBE DEBUG]^7 SubscribePlayerToForests called - Player %d at (%.1f, %.1f, %.1f)", playerId, playerCoords.x, playerCoords.y, playerCoords.z))
+    print(string.format("^3[SUBSCRIBE DEBUG]^7 SubscribePlayerToForests called - Player %d at (%.1f, %.1f, %.1f)",
+        playerId, playerCoords.x, playerCoords.y, playerCoords.z))
     print("^3[SUBSCRIBE DEBUG]^7 GlobalForests has " .. #GlobalForests .. " forests")
-    
+
     local closestForests = {}
 
     for _, forest in ipairs(GlobalForests) do
         local distance = GetDistance(playerCoords.x, playerCoords.y, playerCoords.z, forest.x, forest.y, forest.z)
-        print(string.format("^3[SUBSCRIBE DEBUG]^7 Forest %d at (%.1f, %.1f, %.1f) - distance: %.1f meters", forest.id, forest.x, forest.y, forest.z, distance))
+        print(string.format("^3[SUBSCRIBE DEBUG]^7 Forest %d at (%.1f, %.1f, %.1f) - distance: %.1f meters", forest.id,
+            forest.x, forest.y, forest.z, distance))
         if distance <= Config.RenderDistance then
             print("^2[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " IS IN RANGE")
             table.insert(closestForests, {
@@ -95,7 +97,8 @@ local function SubscribePlayerToForests(playerId, playerCoords)
         end
 
         if not stillInRange and ForestClients[forestId] then
-            print("^1[SUBSCRIBE DEBUG]^7 Removing player " .. playerId .. " from forest " .. forestId .. " (out of range)")
+            print("^1[SUBSCRIBE DEBUG]^7 Removing player " ..
+            playerId .. " from forest " .. forestId .. " (out of range)")
             ForestClients[forestId][playerId] = nil
         end
     end
@@ -156,7 +159,8 @@ AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
     local playerCoords = GetEntityCoords(ped)
     -- Just update subscriptions, don't send full loadForests event
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
-    print("^3[SUBSCRIPTIONS]^7 Updated player " .. _source .. " subscriptions - " .. #closestForests .. " forests in range")
+    print("^3[SUBSCRIPTIONS]^7 Updated player " ..
+    _source .. " subscriptions - " .. #closestForests .. " forests in range")
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:saveNode')
@@ -423,8 +427,9 @@ end)
 RegisterServerEvent('atlas_woodcutting:server:requestStart')
 AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forestId, treeIndex, nodeData)
     local _source = source
-    print("^2[CHOP FLOW]^7 requestStart [SERVER] - Player " .. _source .. " | Forest " .. forestId .. " | Tree " .. treeIndex)
-    
+    print("^2[CHOP FLOW]^7 requestStart [SERVER] - Player " ..
+    _source .. " | Forest " .. forestId .. " | Tree " .. treeIndex)
+
     local token = "CHOP_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
         token = token,
@@ -442,7 +447,7 @@ RegisterServerEvent('atlas_woodcutting:server:finishChop')
 AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local _source = source
     print("^2[CHOP FLOW]^7 finishChop [SERVER] - Player " .. _source .. " | Token: " .. token)
-    
+
     local task = ActiveTasks[_source]
     if not task or task.token ~= token then
         if not task then
