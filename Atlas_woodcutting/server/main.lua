@@ -673,9 +673,19 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
             print("^3[XP AWARD]^7 Export error: " .. tostring(result))
         end
         
-        -- Fallback: Try server event method
+        -- Fallback: Try direct function call via resource export
         local success2, result2 = pcall(function()
-            TriggerEvent('atlas_skilling:awardXP', 'woodcutting', Config.ChopXPReward)
+            -- Try calling the global function directly via another export method
+            if Config.DebugLogging then
+                print("^3[XP AWARD]^7 Attempting direct function call for player " .. _source)
+            end
+            
+            local skillsResource = exports['Atlas_skilling']
+            if skillsResource then
+                return skillsResource:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
+            else
+                error("Atlas_skilling resource not available")
+            end
         end)
         
         if success2 then

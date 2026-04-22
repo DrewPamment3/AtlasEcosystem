@@ -148,7 +148,9 @@ exports('GetSkillLevel', GetSkillLevel)
 RegisterServerEvent('atlas_skilling:awardXP')
 AddEventHandler('atlas_skilling:awardXP', function(skill, amount, personalMult)
     local _source = source
+    print("^3[Atlas Skilling Server Event]^7 Received XP award request for player " .. _source .. " - Skill: " .. skill .. ", Amount: " .. amount)
     AddSkillXP(_source, skill, amount, personalMult)
+    print("^2[Atlas Skilling Server Event]^7 XP award processed for player " .. _source)
 end)
 
 -- Server event method for getting skill level
@@ -168,6 +170,17 @@ RegisterCommand('testskillexports', function(source, args)
         print("^3[Atlas Skilling Debug]^7 Testing exports from console...")
         print("^2[Atlas Skilling Debug]^7 AddSkillXP function exists: " .. tostring(AddSkillXP ~= nil))
         print("^2[Atlas Skilling Debug]^7 GetSkillLevel function exists: " .. tostring(GetSkillLevel ~= nil))
+        
+        -- Test if exports are accessible externally
+        local success, result = pcall(function()
+            return exports['Atlas_skilling']['AddSkillXP']
+        end)
+        print("^2[Atlas Skilling Debug]^7 Export accessible via exports['Atlas_skilling']['AddSkillXP']: " .. tostring(success))
+        if success then
+            print("^2[Atlas Skilling Debug]^7 Export type: " .. tostring(type(result)))
+        else
+            print("^1[Atlas Skilling Debug]^7 Export error: " .. tostring(result))
+        end
         return
     end
 
@@ -193,8 +206,24 @@ RegisterCommand('testskillexports', function(source, args)
     print("^2[Atlas Skilling Debug]^7 Current woodcutting level: " .. tostring(currentLevel))
     
     -- Test AddSkillXP with small amount
-    AddSkillXP(_source, 'woodcutting', 1)
-    print("^2[Atlas Skilling Debug]^7 Added 1 XP to woodcutting")
+    AddSkillXP(_source, 'woodcutting', 5)
+    print("^2[Atlas Skilling Debug]^7 Added 5 XP to woodcutting directly")
     
     VORPcore.NotifyRightTip(_source, "~g~Export test completed - check console", 4000)
+end)
+
+-- Simple command to award XP via server event (for testing)
+RegisterCommand('testawardxp', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Skilling]^7 Use /testawardxp in-game to test server event XP award")
+        return
+    end
+
+    local skill = args[1] or 'woodcutting'
+    local amount = tonumber(args[2]) or 10
+    
+    print("^3[Atlas Skilling]^7 Server event test - awarding " .. amount .. " " .. skill .. " XP to player " .. _source)
+    AddSkillXP(_source, skill, amount)
+    VORPcore.NotifyRightTip(_source, "~g~Awarded " .. amount .. " " .. skill .. " XP via direct function call", 4000)
 end)
