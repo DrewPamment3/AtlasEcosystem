@@ -65,7 +65,7 @@ AtlasWoodConfig.TreeModelZOffsets = {
     ["p_tree_longleafpine_02"] = 1.0,
     ["p_tree_blue_oak_01"] = 2.0,
     ["p_tree_redwood_05"] = 1.0,
-    ["p_tree_redwood_05_lg"] = 1.5,
+    ["p_tree_redwood_05_lg"] = 3.5,
     ["p_tree_engoak_01"] = 1.0,
 }
 
