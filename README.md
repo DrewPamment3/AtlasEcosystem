@@ -3,7 +3,8 @@
 A modular RedM (Red Dead Redemption 2) RPG framework providing progressive skill-based gameplay systems. Currently featuring a core skills system and woodcutting resource gathering module.
 
 **Author:** DrewPamment3  
-**Game:** Red Dead Redemption 3 (RedM)  
+**Game:** Red Dead Redemption 2 (RedM)  
+**Framework:** VORP Core  
 **Version:** 1.0
 
 ---
@@ -117,16 +118,41 @@ Different forest zones can have tier multipliers affecting wood rarity:
 
 **`/listforests [page]`**
 
-- Lists all forests currently in the database with details
-- Displays ID, Name, Radius, Tree Count, Tier, and Coordinates
+- **Admin-only command** - Lists all forests currently in the database with details
+- Displays ID, Name, Radius, Tree Count, Tier, and Coordinates  
 - Shows 10 forests per page (optional page parameter, default: 1)
 - Sorted alphabetically by forest name
 - Example: `/listforests` or `/listforests 2`
 - Output: Formatted console table for easy viewing
 
-**`/debugtrees`**
+**`/refreshforests`** (Admin Command)
 
-- Lists all currently spawned trees with their forest IDs and entity numbers
+- **Admin-only command** - Manually refreshes GlobalForests and GlobalNodes from database
+- Useful for debugging or when forest data becomes out of sync
+- Automatically called when creating/deleting forests, but can be run manually if needed
+- Example: `/refreshforests`
+
+**`/debugtrees`** (Client Command)
+
+- Lists all currently spawned trees in client registry with forest IDs and entity numbers
+- Shows total registry size and details for debugging tree spawning issues
+
+**`/checkgroup`** (Admin Debug)
+
+- Advanced debugging command to verify admin group status from multiple sources
+- Compares VORP Core object data with direct database queries
+- Useful for troubleshooting permission issues with admin commands
+
+**`/spawntree [model] [zOffset]`** (Client Command)
+
+- Debug command to spawn a single tree model in front of player
+- Used for testing tree models and Z-offset positioning
+- Example: `/spawntree p_tree_pine01x 1.0`
+
+**`/listtrees`** (Client Command)
+
+- Lists all available tree models configured in AtlasWoodConfig.TreeModelZOffsets
+- Shows proper usage syntax for createforest command
 
 **Database Requirements:**
 
@@ -159,15 +185,31 @@ Config.XPFormulaDivisor = 1331       -- Used in level calculation
 ### **Atlas_woodcutting Config** (`shared/config.lua`)
 
 ```lua
-AtlasWoodConfig.MinChopTime = 5000   -- Minimum chop duration (ms)
-AtlasWoodConfig.WoodTiers = {...}   -- Loot tiers with level reqs
-AtlasWoodConfig.TierMultipliers = { -- Zone-based rarity multipliers
+AtlasWoodConfig.ChopXPReward = 20            -- XP per successful chop
+AtlasWoodConfig.InteractionKey = 0x760A9C6F  -- G key for chopping
+AtlasWoodConfig.ChopAnimationTime = 5000     -- Animation duration (ms)
+AtlasWoodConfig.MinChopTime = 5000           -- Minimum chop duration (ms)
+AtlasWoodConfig.DebugLogging = true          -- Toggle debug output
+AtlasWoodConfig.RenderDistance = 400         -- Max forest render distance (meters)
+AtlasWoodConfig.RespawnMinutesPerTier = 20   -- Base respawn time per tier
+
+-- Validation ranges for admin commands
+AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }
+AtlasWoodConfig.TreeCountRange = { min = 5, max = 25 }
+AtlasWoodConfig.TierRange = { min = 1, max = 4 }
+
+AtlasWoodConfig.WoodTiers = {...}           -- Loot tiers with level requirements
+AtlasWoodConfig.TierMultipliers = {         -- Zone-based rarity multipliers
     [1] = 1.0,  [2] = 1.5,  [3] = 2.5,  [4] = 5.0
 }
-AtlasWoodConfig.Axes = {...}        -- Axe tier definitions
-AtlasWoodConfig.TreeMaterials = {}  -- Fallback tree detection by material
-AtlasWoodConfig.Trees = {...}       -- Static tree models with XP values
+AtlasWoodConfig.Axes = {...}               -- Axe tier definitions with power multipliers
+AtlasWoodConfig.TreeMaterials = {}         -- Fallback tree detection by material hash
+AtlasWoodConfig.Trees = {}                 -- Static tree models with XP values
+AtlasWoodConfig.TreeModelZOffsets = {}     -- Model-specific Z positioning offsets
 ```
+
+**Key Functions:**
+- `AtlasWoodConfig.GetTreeZOffset(modelName)` - Returns Z offset for tree model (default 0.2)
 
 ---
 
@@ -178,6 +220,8 @@ AtlasWoodConfig.Trees = {...}       -- Static tree models with XP values
 - RedM server running
 - MySQL database
 - VORP Core framework
+- VORP Inventory
+- VORP Menu
 - OxMySQL
 
 ### **Installation**
@@ -192,6 +236,8 @@ AtlasWoodConfig.Trees = {...}       -- Static tree models with XP values
    ensure Atlas_skilling
    ensure Atlas_woodcutting
    ```
+
+   **Note:** Atlas_woodcutting MUST load after Atlas_skilling due to dependency on exported functions.
 3. Ensure MySQL tables are created (auto-created on first character select)
 
 ### **First Run**
@@ -248,12 +294,40 @@ exports.Atlas_skilling:AddSkillXP(playerId, 'woodcutting', 50, 1.5)
 
 ---
 
+## ⚠️ Known Issues & Important Notes
+
+### **VORP Admin Group Check**
+- Admin permissions use `character.group` from the database characters table, NOT `user.group`
+- Correct validation pattern:
+  ```lua
+  local character = user.getUsedCharacter  -- Property, NOT method
+  local charGroup = character and character.group or "user"
+  if charGroup == 'admin' or charGroup == 'superadmin' then
+  ```
+
+### **Client vs Server Commands**
+- Commands requiring game world interaction (tree spawning, coordinate detection) must be **client-side**
+- Server commands should only handle database operations, notifications, and validation
+- Native functions like `CreateObject()`, `GetGroundZFor_3dCoord()` only exist on client
+
+### **Forest Subscription System**
+- Players are automatically subscribed to forests within `RenderDistance` (400m default)  
+- Trees respawn based on tier: Tier 1 = 20min, Tier 2 = 40min, Tier 3 = 80min, Tier 4 = 160min
+- Dead trees show as stumps until respawn timer completes
+- **GlobalForests cache automatically refreshes** when forests are created/deleted via commands
+- Debug logging can be toggled via `AtlasWoodConfig.DebugLogging` in shared config
+
+### **Lua Version Compatibility**
+- Atlas_skilling uses `lua54 'yes'` 
+- Atlas_woodcutting has `lua54` commented out for compatibility
+- Both should work on lua54-enabled servers
+
 ## 🎯 Expansion Ideas
 
 The modular design supports easy expansion:
 
 1. **Mining Module** - Follow woodcutting pattern for ore gathering
-2. **Fishing Module** - Fish locations, water detection events
+2. **Fishing Module** - Fish locations, water detection events  
 3. **Cooking/Smelting** - Recipes, resource conversion, crafting bench
 4. **Hunting** - Animal tracking, reward XP for kills/pelts
 5. **Farming** - Plant growth cycles, harvest mechanics
@@ -266,10 +340,15 @@ Each can use the same `AddSkillXP` export to integrate with the core system.
 ## 🐛 Development Notes
 
 - **Skill Formula**: `Level = floor(sqrt(XP / 1331)) + 1` → Exponential scaling
-- **Tree Spawning**: Uses raycast detection from player shoulder (0.9m height)
-- **Admin Checks**: Both woodcutting commands verify `user.getGroup == 'admin'`
-- **Token System**: Chopping uses random tokens to prevent exploits
-- **Auto-Cleanup**: Dead trees removed when forest is wiped
+- **Tree Spawning**: Uses raycast detection from player shoulder (0.9m height) extending 1.3m forward
+- **Admin Checks**: Verify `character.group` for 'admin'/'superadmin' permissions
+- **Token System**: Chopping uses random tokens to prevent exploits and validate requests
+- **Auto-Cleanup**: Dead trees removed when forest is wiped, player disconnect cleanup implemented
+- **Render Distance**: 400m default, configurable in shared config
+- **Database Auto-Creation**: Tables created automatically on first character select
+- **Forest Client Tracking**: Server tracks which players see which forests for efficient updates
+- **Dynamic Forest Discovery**: New forests are immediately available for subscription after creation
+- **Automatic Cache Management**: GlobalForests and GlobalNodes refresh automatically on forest changes
 
 ---
 
@@ -291,4 +370,4 @@ For issues, improvements, or integration questions, reference the exports and ev
 
 ---
 
-_Last Updated: April 20, 2026_
+_Last Updated: April 22, 2026_

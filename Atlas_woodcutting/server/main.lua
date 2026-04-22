@@ -7,28 +7,73 @@ local ForestClients = {}    -- Track which players see which forests: {forestId 
 local ForestTreeStates = {} -- Track dead trees: {forestId = {treeIndex = chopTime, ...}}
 local RespawnTimers = {}    -- Track respawn timers: {forestId_treeIndex = timerId}
 
-Citizen.CreateThread(function()
-    Citizen.Wait(1000)
+-- Helper: Refresh GlobalForests from database
+local function RefreshGlobalForests(callback)
+    if Config.DebugLogging then
+        print("^3[FOREST REFRESH]^7 Refreshing GlobalForests from database...")
+    end
+    
     exports.oxmysql:execute('SELECT * FROM atlas_woodcutting_forests', {}, function(forests)
         if forests then
             GlobalForests = forests
-            print("^2[Atlas]^7 Server loaded " .. #forests .. " forests from DB.")
+            if Config.DebugLogging then
+                print("^2[FOREST REFRESH]^7 Updated GlobalForests - now contains " .. #forests .. " forests")
+                for _, forest in ipairs(forests) do
+                    print(string.format("^2[FOREST REFRESH]^7   Forest ID %d: '%s' at (%.1f, %.1f, %.1f)", 
+                        forest.id, forest.name, forest.x, forest.y, forest.z))
+                end
+            end
+            
+            if callback then callback() end
+        else
+            if Config.DebugLogging then
+                print("^1[FOREST REFRESH]^7 ERROR: Failed to load forests from database")
+            end
         end
     end)
+end
 
-    Citizen.Wait(500)
+-- Helper: Refresh GlobalNodes from database  
+local function RefreshGlobalNodes(callback)
+    if Config.DebugLogging then
+        print("^3[NODE REFRESH]^7 Refreshing GlobalNodes from database...")
+    end
+    
     exports.oxmysql:execute('SELECT x, y, z, model_name, forest_id FROM atlas_woodcutting_nodes', {}, function(nodes)
         if nodes then
             GlobalNodes = nodes
-            print("^2[Atlas]^7 Server loaded " .. #nodes .. " nodes from DB.")
+            if Config.DebugLogging then
+                print("^2[NODE REFRESH]^7 Updated GlobalNodes - now contains " .. #nodes .. " nodes")
+            end
+            
+            if callback then callback() end
+        else
+            if Config.DebugLogging then
+                print("^1[NODE REFRESH]^7 ERROR: Failed to load nodes from database")
+            end
         end
+    end)
+end
+
+-- Initial data load on resource start
+Citizen.CreateThread(function()
+    Citizen.Wait(1000)
+    
+    -- Load forests first, then nodes
+    RefreshGlobalForests(function()
+        print("^2[Atlas Woodcutting]^7 Initial load: " .. #GlobalForests .. " forests loaded from database")
+        
+        Citizen.Wait(500)
+        RefreshGlobalNodes(function()
+            print("^2[Atlas Woodcutting]^7 Initial load: " .. #GlobalNodes .. " nodes loaded from database")
+        end)
     end)
 end)
 
 -- Helper: Calculate respawn time in seconds based on forest tier
 local function GetRespawnSeconds(forestTier)
     local baseMinutes = Config.RespawnMinutesPerTier
-    local multiplier = math.pow(2, forestTier - 1) -- Tier 1 = 1x, Tier 2 = 2x, Tier 3 = 4x, Tier 4 = 8x
+    local multiplier = 2 ^ (forestTier - 1) -- Tier 1 = 1x, Tier 2 = 2x, Tier 3 = 4x, Tier 4 = 8x
     return (baseMinutes * multiplier) * 60
 end
 
@@ -58,18 +103,25 @@ end
 
 -- Helper: Subscribe player to nearby forests
 local function SubscribePlayerToForests(playerId, playerCoords)
-    print(string.format("^3[SUBSCRIBE DEBUG]^7 SubscribePlayerToForests called - Player %d at (%.1f, %.1f, %.1f)",
-        playerId, playerCoords.x, playerCoords.y, playerCoords.z))
-    print("^3[SUBSCRIBE DEBUG]^7 GlobalForests has " .. #GlobalForests .. " forests")
+    if Config.DebugLogging then
+        print(string.format("^3[SUBSCRIBE DEBUG]^7 SubscribePlayerToForests called - Player %d at (%.1f, %.1f, %.1f)",
+            playerId, playerCoords.x, playerCoords.y, playerCoords.z))
+        print("^3[SUBSCRIBE DEBUG]^7 GlobalForests has " .. #GlobalForests .. " forests")
+    end
 
     local closestForests = {}
 
     for _, forest in ipairs(GlobalForests) do
         local distance = GetDistance(playerCoords.x, playerCoords.y, playerCoords.z, forest.x, forest.y, forest.z)
-        print(string.format("^3[SUBSCRIBE DEBUG]^7 Forest %d at (%.1f, %.1f, %.1f) - distance: %.1f meters", forest.id,
-            forest.x, forest.y, forest.z, distance))
+        if Config.DebugLogging then
+            print(string.format("^3[SUBSCRIBE DEBUG]^7 Forest %d at (%.1f, %.1f, %.1f) - distance: %.1f meters", forest.id,
+                forest.x, forest.y, forest.z, distance))
+        end
+        
         if distance <= Config.RenderDistance then
-            print("^2[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " IS IN RANGE")
+            if Config.DebugLogging then
+                print("^2[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " IS IN RANGE")
+            end
             table.insert(closestForests, {
                 id = forest.id,
                 x = forest.x,
@@ -79,14 +131,21 @@ local function SubscribePlayerToForests(playerId, playerCoords)
                 tier = forest.tier
             })
         else
-            print("^3[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " is out of range")
+            if Config.DebugLogging then
+                print("^3[SUBSCRIBE DEBUG]^7 Forest " .. forest.id .. " is out of range")
+            end
         end
     end
 
-    print("^3[SUBSCRIBE DEBUG]^7 Player will be subscribed to " .. #closestForests .. " forests")
+    if Config.DebugLogging then
+        print("^3[SUBSCRIBE DEBUG]^7 Player will be subscribed to " .. #closestForests .. " forests")
+    end
 
     -- Update ForestClients tracking - REMOVE from dead forests
-    print("^3[SUBSCRIBE DEBUG]^7 Checking existing subscriptions...")
+    if Config.DebugLogging then
+        print("^3[SUBSCRIBE DEBUG]^7 Checking existing subscriptions...")
+    end
+    
     for forestId, _ in pairs(ForestClients) do
         local stillInRange = false
         for _, forest in ipairs(closestForests) do
@@ -97,26 +156,37 @@ local function SubscribePlayerToForests(playerId, playerCoords)
         end
 
         if not stillInRange and ForestClients[forestId] then
-            print("^1[SUBSCRIBE DEBUG]^7 Removing player " ..
-            playerId .. " from forest " .. forestId .. " (out of range)")
+            if Config.DebugLogging then
+                print("^1[SUBSCRIBE DEBUG]^7 Removing player " ..
+                playerId .. " from forest " .. forestId .. " (out of range)")
+            end
             ForestClients[forestId][playerId] = nil
         end
     end
 
     -- ADD to new forests
-    print("^3[SUBSCRIBE DEBUG]^7 Adding to new forests...")
+    if Config.DebugLogging then
+        print("^3[SUBSCRIBE DEBUG]^7 Adding to new forests...")
+    end
+    
     for _, forest in ipairs(closestForests) do
         if not ForestClients[forest.id] then
-            print("^2[SUBSCRIBE DEBUG]^7 Creating ForestClients[" .. forest.id .. "]")
+            if Config.DebugLogging then
+                print("^2[SUBSCRIBE DEBUG]^7 Creating ForestClients[" .. forest.id .. "]")
+            end
             ForestClients[forest.id] = {}
         end
-        print("^2[SUBSCRIBE DEBUG]^7 Adding player " .. playerId .. " to forest " .. forest.id)
+        if Config.DebugLogging then
+            print("^2[SUBSCRIBE DEBUG]^7 Adding player " .. playerId .. " to forest " .. forest.id)
+        end
         ForestClients[forest.id][playerId] = true
     end
 
-    print("^2[SUBSCRIBE DEBUG]^7 Final ForestClients state:")
-    for fId, clients in pairs(ForestClients) do
-        print("  Forest " .. fId .. ": " .. CountTable(clients) .. " clients")
+    if Config.DebugLogging then
+        print("^2[SUBSCRIBE DEBUG]^7 Final ForestClients state:")
+        for fId, clients in pairs(ForestClients) do
+            print("  Forest " .. fId .. ": " .. CountTable(clients) .. " clients")
+        end
     end
 
     return closestForests
@@ -159,8 +229,10 @@ AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
     local playerCoords = GetEntityCoords(ped)
     -- Just update subscriptions, don't send full loadForests event
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
-    print("^3[SUBSCRIPTIONS]^7 Updated player " ..
-    _source .. " subscriptions - " .. #closestForests .. " forests in range")
+    if Config.DebugLogging then
+        print("^3[SUBSCRIPTIONS]^7 Updated player " ..
+        _source .. " subscriptions - " .. #closestForests .. " forests in range")
+    end
 end)
 
 RegisterServerEvent('atlas_woodcutting:server:saveNode')
@@ -282,9 +354,17 @@ RegisterCommand('createforest', function(source, args)
         'INSERT INTO atlas_woodcutting_forests (x, y, z, radius, tree_count, tier, model_name, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, model, name }, function(fId)
             if fId then
+                -- Success: Update GlobalForests immediately
+                RefreshGlobalForests(function()
+                    if Config.DebugLogging then
+                        print("^2[CREATE FOREST]^7 GlobalForests refreshed after creating forest ID " .. fId)
+                    end
+                end)
+                
                 VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
                 TriggerClientEvent('atlas_woodcutting:client:generateForestNodes', _source, fId, pCoords, radius, count,
                     model)
+                print("^2[Atlas Woodcutting Admin]^7 Forest '" .. name .. "' (ID: " .. fId .. ") created by player " .. _source)
             else
                 VORPcore.NotifyRightTip(_source, "~r~Failed to create forest in database", 4000)
                 print("^1[Atlas Woodcutting]^7 Failed to insert forest for admin " .. _source)
@@ -321,11 +401,21 @@ RegisterCommand('wipeforest', function(source, args)
     if targetId == 'all' then
         -- Wipe all forests
         exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes')
-        exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests')
-        GlobalNodes = {}
-        TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
-        VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
-        print("^2[Atlas Woodcutting Admin]^7 All forests wiped by " .. _source)
+        exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests', {}, function()
+            -- Update both GlobalForests and GlobalNodes after successful deletion
+            GlobalForests = {}
+            GlobalNodes = {}
+            ForestClients = {}  -- Clear all subscriptions
+            ForestTreeStates = {} -- Clear all tree states
+            
+            if Config.DebugLogging then
+                print("^2[WIPE ALL]^7 Cleared all GlobalForests, GlobalNodes, ForestClients, and ForestTreeStates")
+            end
+            
+            TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
+            VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
+            print("^2[Atlas Woodcutting Admin]^7 All forests wiped by player " .. _source)
+        end)
     else
         -- Wipe specific forest by ID
         local fId = tonumber(targetId)
@@ -337,18 +427,67 @@ RegisterCommand('wipeforest', function(source, args)
         exports.oxmysql:execute('SELECT id FROM atlas_woodcutting_forests WHERE id = ?', { fId }, function(result)
             if result and result[1] then
                 exports.oxmysql:execute('DELETE FROM atlas_woodcutting_nodes WHERE forest_id = ?', { fId })
-                exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId })
-                for i = #GlobalNodes, 1, -1 do
-                    if GlobalNodes[i].forest_id == fId then table.remove(GlobalNodes, i) end
-                end
-                TriggerClientEvent('atlas_woodcutting:client:wipeSpecificForest', -1, fId)
-                VORPcore.NotifyRightTip(_source, "~g~Forest ID " .. fId .. " wiped successfully", 4000)
-                print("^2[Atlas Woodcutting Admin]^7 Forest ID " .. fId .. " wiped by " .. _source)
+                exports.oxmysql:execute('DELETE FROM atlas_woodcutting_forests WHERE id = ?', { fId }, function()
+                    -- Update GlobalForests and GlobalNodes after successful deletion
+                    RefreshGlobalForests(function()
+                        RefreshGlobalNodes(function()
+                            -- Clean up related data structures
+                            ForestClients[fId] = nil
+                            ForestTreeStates[fId] = nil
+                            
+                            -- Clear any respawn timers for this forest
+                            for timerKey, timerId in pairs(RespawnTimers) do
+                                if timerKey:match("^" .. fId .. "_") then
+                                    RemoveTimeout(timerId)
+                                    RespawnTimers[timerKey] = nil
+                                end
+                            end
+                            
+                            if Config.DebugLogging then
+                                print("^2[WIPE FOREST]^7 Cleaned up all data for forest ID " .. fId)
+                            end
+                            
+                            TriggerClientEvent('atlas_woodcutting:client:wipeSpecificForest', -1, fId)
+                            VORPcore.NotifyRightTip(_source, "~g~Forest ID " .. fId .. " wiped successfully", 4000)
+                            print("^2[Atlas Woodcutting Admin]^7 Forest ID " .. fId .. " wiped by player " .. _source)
+                        end)
+                    end)
+                end)
             else
                 VORPcore.NotifyRightTip(_source, "~r~Forest ID " .. fId .. " not found", 4000)
             end
         end)
     end
+end)
+
+-- Debug command to manually refresh forest data
+RegisterCommand('refreshforests', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /refreshforests is for in-game players only")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    RefreshGlobalForests(function()
+        RefreshGlobalNodes(function()
+            VORPcore.NotifyRightTip(_source, "~g~Forest data refreshed successfully", 4000)
+            print("^2[Atlas Woodcutting Admin]^7 Forest data manually refreshed by player " .. _source)
+            print("^2[Atlas Woodcutting Admin]^7 Now tracking " .. #GlobalForests .. " forests and " .. #GlobalNodes .. " nodes")
+        end)
+    end)
 end)
 
 RegisterCommand('listforests', function(source, args)
@@ -463,12 +602,18 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local nodeData = task.nodeData
     print("^2[CHOP FLOW]^7 Marking tree dead - Forest " .. forestId .. " | Tree " .. treeIndex)
 
+    -- Award XP using Atlas_skilling export
     local success, result = pcall(function()
-        return exports.Atlas_skilling:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
+        return exports['Atlas_skilling']:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
     end)
 
     if not success then
         print("^1[Atlas Woodcutting]^7 Error awarding XP to player " .. _source .. ": " .. tostring(result))
+        print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
+    else
+        if Config.DebugLogging then
+            print("^2[CHOP FLOW]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP to player " .. _source)
+        end
     end
 
     -- Mark tree as dead
