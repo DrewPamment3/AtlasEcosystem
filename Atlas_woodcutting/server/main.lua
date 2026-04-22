@@ -66,6 +66,29 @@ Citizen.CreateThread(function()
         Citizen.Wait(500)
         RefreshGlobalNodes(function()
             print("^2[Atlas Woodcutting]^7 Initial load: " .. #GlobalNodes .. " nodes loaded from database")
+            
+            -- Test Atlas_skilling connection after resource is fully loaded
+            Citizen.Wait(2000) -- Give extra time for Atlas_skilling to load
+            print("^3[Atlas Woodcutting]^7 Testing Atlas_skilling connection...")
+            
+            local skillResourceState = GetResourceState('Atlas_skilling')
+            print("^3[Atlas Woodcutting]^7 Atlas_skilling resource state: " .. tostring(skillResourceState))
+            
+            if skillResourceState == 'started' then
+                local success, result = pcall(function()
+                    return exports['Atlas_skilling']['AddSkillXP']
+                end)
+                
+                if success and result then
+                    print("^2[Atlas Woodcutting]^7 ✅ Atlas_skilling export connection successful!")
+                else
+                    print("^1[Atlas Woodcutting]^7 ❌ Atlas_skilling export not accessible: " .. tostring(result))
+                    print("^1[Atlas Woodcutting]^7 Will attempt to use server event fallback method")
+                end
+            else
+                print("^1[Atlas Woodcutting]^7 ❌ Atlas_skilling resource not started - current state: " .. tostring(skillResourceState))
+                print("^1[Atlas Woodcutting]^7 Please ensure Atlas_skilling is started before Atlas_woodcutting")
+            end
         end)
     end)
 end)
@@ -460,6 +483,43 @@ RegisterCommand('wipeforest', function(source, args)
     end
 end)
 
+-- Debug command to test Atlas_skilling connection
+RegisterCommand('testatlasconnection', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting Debug]^7 Testing Atlas_skilling connection from console...")
+        
+        -- Test if resource exists
+        local skillResource = GetResourceState('Atlas_skilling')
+        print("^3[Atlas Woodcutting Debug]^7 Atlas_skilling resource state: " .. tostring(skillResource))
+        
+        -- Test export availability
+        local success1, result1 = pcall(function()
+            return exports['Atlas_skilling']
+        end)
+        print("^3[Atlas Woodcutting Debug]^7 Atlas_skilling exports accessible: " .. tostring(success1))
+        if not success1 then
+            print("^1[Atlas Woodcutting Debug]^7 Export access error: " .. tostring(result1))
+        end
+        
+        -- Test specific export
+        local success2, result2 = pcall(function()
+            return exports['Atlas_skilling']['AddSkillXP']
+        end)
+        print("^3[Atlas Woodcutting Debug]^7 AddSkillXP export exists: " .. tostring(success2))
+        if not success2 then
+            print("^1[Atlas Woodcutting Debug]^7 AddSkillXP error: " .. tostring(result2))
+        else
+            print("^2[Atlas Woodcutting Debug]^7 AddSkillXP function type: " .. tostring(type(result2)))
+        end
+        
+        return
+    end
+    
+    print("^3[Atlas Woodcutting Debug]^7 Use this command from server console for full debug info")
+    VORPcore.NotifyRightTip(_source, "~y~Check server console for connection test results", 4000)
+end)
+
 -- Debug command to manually refresh forest data
 RegisterCommand('refreshforests', function(source, args)
     local _source = source
@@ -602,17 +662,35 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local nodeData = task.nodeData
     print("^2[CHOP FLOW]^7 Marking tree dead - Forest " .. forestId .. " | Tree " .. treeIndex)
 
-    -- Award XP using Atlas_skilling export
+    -- Award XP using Atlas_skilling - try export method first, then fallback to server event
     local success, result = pcall(function()
         return exports['Atlas_skilling']:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
     end)
 
     if not success then
-        print("^1[Atlas Woodcutting]^7 Error awarding XP to player " .. _source .. ": " .. tostring(result))
-        print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
+        if Config.DebugLogging then
+            print("^3[XP AWARD]^7 Export method failed, trying server event method...")
+            print("^3[XP AWARD]^7 Export error: " .. tostring(result))
+        end
+        
+        -- Fallback: Try server event method
+        local success2, result2 = pcall(function()
+            TriggerEvent('atlas_skilling:awardXP', 'woodcutting', Config.ChopXPReward)
+        end)
+        
+        if success2 then
+            if Config.DebugLogging then
+                print("^2[XP AWARD]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP via server event to player " .. _source)
+            end
+        else
+            print("^1[Atlas Woodcutting]^7 Both export and server event methods failed for player " .. _source)
+            print("^1[Atlas Woodcutting]^7 Export error: " .. tostring(result))
+            print("^1[Atlas Woodcutting]^7 Event error: " .. tostring(result2))
+            print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
+        end
     else
         if Config.DebugLogging then
-            print("^2[CHOP FLOW]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP to player " .. _source)
+            print("^2[XP AWARD]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP via export to player " .. _source)
         end
     end
 

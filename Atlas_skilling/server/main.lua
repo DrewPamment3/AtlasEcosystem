@@ -139,3 +139,62 @@ function GetSkillLevel(source, skill)
 
     return 1
 end
+
+-- Explicitly register exports (FiveM/RedM sometimes needs this)
+exports('AddSkillXP', AddSkillXP)
+exports('GetSkillLevel', GetSkillLevel)
+
+-- Alternative server event method for XP awarding (backup method)
+RegisterServerEvent('atlas_skilling:awardXP')
+AddEventHandler('atlas_skilling:awardXP', function(skill, amount, personalMult)
+    local _source = source
+    AddSkillXP(_source, skill, amount, personalMult)
+end)
+
+-- Server event method for getting skill level
+RegisterServerEvent('atlas_skilling:getLevel')
+AddEventHandler('atlas_skilling:getLevel', function(skill, callback)
+    local _source = source
+    local level = GetSkillLevel(_source, skill)
+    if callback then
+        TriggerEvent(callback, level)
+    end
+end)
+
+-- Debug command to test exports are working
+RegisterCommand('testskillexports', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Skilling Debug]^7 Testing exports from console...")
+        print("^2[Atlas Skilling Debug]^7 AddSkillXP function exists: " .. tostring(AddSkillXP ~= nil))
+        print("^2[Atlas Skilling Debug]^7 GetSkillLevel function exists: " .. tostring(GetSkillLevel ~= nil))
+        return
+    end
+
+    local User = VORPcore.getUser(_source)
+    if not User then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local Character = User.getUsedCharacter
+    if not Character then
+        VORPcore.NotifyRightTip(_source, "~r~No character selected", 4000)
+        return
+    end
+
+    -- Test the functions directly
+    print("^3[Atlas Skilling Debug]^7 Testing exports for player " .. _source)
+    print("^2[Atlas Skilling Debug]^7 AddSkillXP function exists: " .. tostring(AddSkillXP ~= nil))
+    print("^2[Atlas Skilling Debug]^7 GetSkillLevel function exists: " .. tostring(GetSkillLevel ~= nil))
+    
+    -- Test GetSkillLevel
+    local currentLevel = GetSkillLevel(_source, 'woodcutting')
+    print("^2[Atlas Skilling Debug]^7 Current woodcutting level: " .. tostring(currentLevel))
+    
+    -- Test AddSkillXP with small amount
+    AddSkillXP(_source, 'woodcutting', 1)
+    print("^2[Atlas Skilling Debug]^7 Added 1 XP to woodcutting")
+    
+    VORPcore.NotifyRightTip(_source, "~g~Export test completed - check console", 4000)
+end)
