@@ -662,45 +662,17 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local nodeData = task.nodeData
     print("^2[CHOP FLOW]^7 Marking tree dead - Forest " .. forestId .. " | Tree " .. treeIndex)
 
-    -- Award XP using Atlas_skilling - try export method first, then fallback to server event
+    -- Award XP using Atlas_skilling export
     local success, result = pcall(function()
         return exports['Atlas_skilling']:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
     end)
 
     if not success then
-        if Config.DebugLogging then
-            print("^3[XP AWARD]^7 Export method failed, trying server event method...")
-            print("^3[XP AWARD]^7 Export error: " .. tostring(result))
-        end
-        
-        -- Fallback: Try direct function call via resource export
-        local success2, result2 = pcall(function()
-            -- Try calling the global function directly via another export method
-            if Config.DebugLogging then
-                print("^3[XP AWARD]^7 Attempting direct function call for player " .. _source)
-            end
-            
-            local skillsResource = exports['Atlas_skilling']
-            if skillsResource then
-                return skillsResource:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
-            else
-                error("Atlas_skilling resource not available")
-            end
-        end)
-        
-        if success2 then
-            if Config.DebugLogging then
-                print("^2[XP AWARD]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP via server event to player " .. _source)
-            end
-        else
-            print("^1[Atlas Woodcutting]^7 Both export and server event methods failed for player " .. _source)
-            print("^1[Atlas Woodcutting]^7 Export error: " .. tostring(result))
-            print("^1[Atlas Woodcutting]^7 Event error: " .. tostring(result2))
-            print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
-        end
+        print("^1[Atlas Woodcutting]^7 Error awarding XP to player " .. _source .. ": " .. tostring(result))
+        print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
     else
         if Config.DebugLogging then
-            print("^2[XP AWARD]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP via export to player " .. _source)
+            print("^2[CHOP FLOW]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP to player " .. _source)
         end
     end
 
