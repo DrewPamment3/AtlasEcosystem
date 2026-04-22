@@ -140,4 +140,11 @@ function GetSkillLevel(source, skill)
     return 1
 end
 
+-- Properly register the exports for other resources to use
+exports('AddSkillXP', AddSkillXP)
+exports('GetSkillLevel', GetSkillLevel)
 
+-- Debug: Print export registration
+print("^2[Atlas Skilling]^7 Exports registered successfully:")
+print("^2[Atlas Skilling]^7 - AddSkillXP")
+print("^2[Atlas Skilling]^7 - GetSkillLevel")
