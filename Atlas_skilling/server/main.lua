@@ -119,7 +119,41 @@ end, false)
 
 -- Returns the player's level for a specific skill
 -- Calculation: floor(sqrt(currentXP / Divisor)) + 1
-function GetSkillLevel(source, skill)
+function GetSkillLevel(source, skill, callback)
+    local User = VORPcore.getUser(source)
+    if not User then 
+        if callback then callback(1) end
+        return 1 
+    end
+
+    local Character = User.getUsedCharacter
+    if not Character then 
+        if callback then callback(1) end
+        return 1 
+    end
+
+    local charidentifier = Character.charIdentifier
+    local skillColumn = string.lower(skill) .. "_xp"
+
+    -- Use regular scalar with callback - scalar_await doesn't exist
+    exports.oxmysql:scalar('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', 
+        { charidentifier }, function(currentXP)
+            local level = 1
+            if currentXP then
+                level = math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
+            end
+            
+            if callback then
+                callback(level)
+            end
+        end)
+    
+    -- Return default level immediately for backward compatibility
+    return 1
+end
+
+-- Synchronous version using a different approach for immediate needs
+function GetSkillLevelSync(source, skill)
     local User = VORPcore.getUser(source)
     if not User then return 1 end
 
@@ -128,12 +162,14 @@ function GetSkillLevel(source, skill)
 
     local charidentifier = Character.charIdentifier
     local skillColumn = string.lower(skill) .. "_xp"
+    
+    -- This is a blocking call - use only when absolutely necessary
+    local success, currentXP = pcall(function()
+        return exports.oxmysql:scalar_sync('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', 
+            { charidentifier })
+    end)
 
-    -- Using await for a synchronous return to the calling script
-    local currentXP = exports.oxmysql:scalar_await(
-        'SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', { charidentifier })
-
-    if currentXP then
+    if success and currentXP then
         return math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
     end
 
@@ -143,8 +179,10 @@ end
 -- Properly register the exports for other resources to use
 exports('AddSkillXP', AddSkillXP)
 exports('GetSkillLevel', GetSkillLevel)
+exports('GetSkillLevelSync', GetSkillLevelSync)
 
 -- Debug: Print export registration
 print("^2[Atlas Skilling]^7 Exports registered successfully:")
 print("^2[Atlas Skilling]^7 - AddSkillXP")
-print("^2[Atlas Skilling]^7 - GetSkillLevel")
+print("^2[Atlas Skilling]^7 - GetSkillLevel (async with callback)")
+print("^2[Atlas Skilling]^7 - GetSkillLevelSync (synchronous)")

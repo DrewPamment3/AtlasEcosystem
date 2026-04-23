@@ -192,9 +192,9 @@ end
 
 -- Main loot calculation and award function
 local function ProcessWoodcuttingLoot(source, groveTier)
-    -- Get player's woodcutting level
+    -- Get player's woodcutting level using synchronous version
     local success, playerLevel = pcall(function()
-        return exports['Atlas_skilling']:GetSkillLevel(source, 'woodcutting')
+        return exports['Atlas_skilling']:GetSkillLevelSync(source, 'woodcutting')
     end)
     
     if not success then

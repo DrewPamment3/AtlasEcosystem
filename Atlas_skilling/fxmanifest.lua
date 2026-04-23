@@ -20,7 +20,8 @@ dependencies {
 
 exports {
     'AddSkillXP',
-    'GetSkillLevel'
+    'GetSkillLevel',
+    'GetSkillLevelSync'
 }
 
 version '1.0'
