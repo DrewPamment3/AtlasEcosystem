@@ -59,6 +59,18 @@ end
 Citizen.CreateThread(function()
     Citizen.Wait(1000)
     
+    -- Validate loot system configuration first
+    print("^3[Atlas Woodcutting]^7 Validating loot system configuration...")
+    local isValid = AtlasWoodConfig.ValidateLootSystem()
+    
+    if not isValid then
+        print("^1[Atlas Woodcutting]^7 ❌ CRITICAL: Loot system configuration is invalid!")
+        print("^1[Atlas Woodcutting]^7 Please fix configuration errors before using woodcutting")
+        return
+    else
+        print("^2[Atlas Woodcutting]^7 ✓ Loot system configuration validated")
+    end
+    
     -- Load forests first, then nodes
     RefreshGlobalForests(function()
         print("^2[Atlas Woodcutting]^7 Initial load: " .. #GlobalForests .. " forests loaded from database")
@@ -122,6 +134,126 @@ local function CountTable(t)
         count = count + 1
     end
     return count
+end
+
+-- Helper: Get player's axe tier from inventory
+local function GetPlayerAxeTier(source)
+    -- Check player's inventory for axes, return the highest tier they have
+    local axeTier = 1 -- Default to crude axe
+    
+    for axeName, axeData in pairs(Config.Axes) do
+        local success, hasAxe = pcall(function()
+            local item = exports.vorp_inventory:getItem(source, axeName)
+            return item and item.count and item.count > 0
+        end)
+        
+        if success and hasAxe then
+            axeTier = math.max(axeTier, axeData.tier)
+        end
+    end
+    
+    return axeTier
+end
+
+-- Helper: Award loot to player
+local function AwardLoot(source, woodType, quantity, isBonus)
+    local success, result = pcall(function()
+        return exports.vorp_inventory:addItem(source, woodType, quantity)
+    end)
+    
+    if success then
+        -- Get display name for notification
+        local displayName = woodType:gsub("wood_", ""):gsub("_", " ")
+        displayName = displayName:sub(1,1):upper() .. displayName:sub(2) .. " Wood"
+        
+        local bonusText = isBonus and " (Bonus)" or ""
+        local quantityText = quantity > 1 and (" x" .. quantity) or ""
+        
+        VORPcore.NotifyRightTip(source, "~g~Received: " .. displayName .. quantityText .. bonusText, 3000)
+        
+        if Config.DebugLogging then
+            print("^2[LOOT AWARD]^7 Player " .. source .. " received " .. quantity .. "x " .. woodType .. bonusText)
+        end
+        
+        return true
+    else
+        if Config.DebugLogging then
+            print("^1[LOOT AWARD]^7 Failed to award " .. woodType .. " to player " .. source .. ": " .. tostring(result))
+        end
+        
+        -- Check if it's an inventory full error
+        if tostring(result):find("full") or tostring(result):find("space") then
+            VORPcore.NotifyRightTip(source, "~r~Your inventory is too full to harvest", 4000)
+        end
+        
+        return false
+    end
+end
+
+-- Main loot calculation and award function
+local function ProcessWoodcuttingLoot(source, groveTier)
+    -- Get player's woodcutting level
+    local success, playerLevel = pcall(function()
+        return exports['Atlas_skilling']:GetSkillLevel(source, 'woodcutting')
+    end)
+    
+    if not success then
+        print("^1[Atlas Woodcutting]^7 Error getting player level for loot: " .. tostring(playerLevel))
+        return false -- Return false to indicate no bonus loot
+    end
+    
+    -- Get player's axe tier
+    local axeTier = GetPlayerAxeTier(source)
+    
+    if Config.DebugLogging then
+        print("^3[LOOT DEBUG]^7 Player " .. source .. " - Level: " .. playerLevel .. " - Grove Tier: " .. groveTier .. " - Axe Tier: " .. axeTier)
+    end
+    
+    -- Calculate primary loot weights
+    local weights, totalWeight = AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, false)
+    
+    -- Check if player can access this grove
+    if not weights then
+        local requiredLevel = totalWeight -- totalWeight contains required level when weights is nil
+        VORPcore.NotifyRightTip(source, "~r~Come back when you improve (Level Required: " .. requiredLevel .. ")", 4000)
+        return false -- Return false to indicate no bonus loot
+    end
+    
+    if totalWeight <= 0 then
+        print("^1[LOOT DEBUG]^7 No valid loot weights calculated for player " .. source)
+        return false -- Return false to indicate no bonus loot
+    end
+    
+    -- Roll for primary loot
+    local primaryLoot = AtlasWoodConfig.RollForLoot(weights, totalWeight)
+    if primaryLoot then
+        AwardLoot(source, primaryLoot, 1, false)
+    end
+    
+    -- Calculate bonus loot chance
+    local bonusChance = AtlasWoodConfig.CalculateBonusChance(playerLevel, axeTier)
+    local bonusRoll = math.random() * 100
+    
+    if Config.DebugLogging then
+        print("^3[LOOT DEBUG]^7 Bonus chance: " .. string.format("%.1f%%", bonusChance) .. " - Roll: " .. string.format("%.1f", bonusRoll))
+    end
+    
+    -- Roll for bonus loot
+    local hasBonusLoot = false
+    if bonusRoll <= bonusChance then
+        local bonusWeights, bonusTotalWeight = AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, true)
+        
+        if bonusWeights and bonusTotalWeight > 0 then
+            local bonusLoot = AtlasWoodConfig.RollForLoot(bonusWeights, bonusTotalWeight)
+            if bonusLoot then
+                AwardLoot(source, bonusLoot, 1, true)
+                hasBonusLoot = true
+            end
+        end
+    end
+    
+    -- Return whether bonus loot was awarded (for XP calculation)
+    return hasBonusLoot
 end
 
 -- Helper: Subscribe player to nearby forests
@@ -550,6 +682,250 @@ RegisterCommand('refreshforests', function(source, args)
     end)
 end)
 
+-- Debug command to test loot calculations
+RegisterCommand('testloot', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    local playerLevel = tonumber(args[1]) or 1
+    local groveTier = tonumber(args[2]) or 1
+    local axeTier = tonumber(args[3]) or 1
+
+    print("^2[LOOT TEST]^7 Testing loot calculation:")
+    print("^3  Player Level:^7 " .. playerLevel)
+    print("^3  Grove Tier:^7 " .. groveTier)  
+    print("^3  Axe Tier:^7 " .. axeTier)
+
+    -- Calculate weights
+    local weights, totalWeight = AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, false)
+    
+    if not weights then
+        local requiredLevel = totalWeight
+        print("^1[LOOT TEST]^7 Player cannot access tier " .. groveTier .. " grove (requires level " .. requiredLevel .. ")")
+        return
+    end
+
+    -- Display probabilities
+    print("^2[LOOT TEST]^7 Primary Loot Probabilities:")
+    for woodType, weight in pairs(weights) do
+        local percentage = (weight / totalWeight) * 100
+        print("^3  " .. woodType .. ":^7 " .. string.format("%.2f%% (weight: %.2f)", percentage, weight))
+    end
+
+    -- Calculate bonus chance
+    local bonusChance = AtlasWoodConfig.CalculateBonusChance(playerLevel, axeTier)
+    print("^2[LOOT TEST]^7 Bonus Loot Chance: " .. string.format("%.1f%%", bonusChance))
+
+    -- Calculate XP rewards
+    local baseXP = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, false)
+    local bonusXP = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, true)
+    print("^2[XP TEST]^7 XP Rewards:")
+    print("^3  Base XP (no bonus loot):^7 " .. baseXP)
+    print("^3  Bonus XP (with bonus loot):^7 " .. bonusXP .. " (+" .. (bonusXP - baseXP) .. " bonus)")
+
+    -- Test multiple rolls
+    print("^2[LOOT TEST]^7 Sample rolls (10x):")
+    for i = 1, 10 do
+        local result = AtlasWoodConfig.RollForLoot(weights, totalWeight)
+        local bonusRoll = math.random() * 100
+        local bonusResult = ""
+        local xpAmount = baseXP
+        
+        if bonusRoll <= bonusChance then
+            local bonusWeights, bonusTotalWeight = AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, true)
+            if bonusWeights and bonusTotalWeight > 0 then
+                local bonusLoot = AtlasWoodConfig.RollForLoot(bonusWeights, bonusTotalWeight)
+                bonusResult = " + " .. (bonusLoot or "NONE") .. " (bonus)"
+                xpAmount = bonusXP
+            end
+        end
+        
+        print("^3  Roll " .. i .. ":^7 " .. (result or "NONE") .. bonusResult .. " | XP: " .. xpAmount)
+    end
+
+    VORPcore.NotifyRightTip(_source, "~g~Loot & XP test complete - check console", 3000)
+end)
+
+-- Debug command to simulate giving loot for testing
+RegisterCommand('simulateloot', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    local groveTier = tonumber(args[1]) or 1
+    
+    print("^2[LOOT SIMULATE]^7 Simulating complete woodcutting experience for player " .. _source .. " in tier " .. groveTier .. " grove")
+    
+    -- Process loot and get bonus status
+    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier)
+    
+    -- Get player's axe tier and calculate XP
+    local axeTier = GetPlayerAxeTier(_source)
+    local xpReward = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, hasBonusLoot)
+    
+    -- Simulate XP award (but don't actually give it to avoid exploits)
+    local bonusText = hasBonusLoot and " (DOUBLE XP for bonus loot!)" or ""
+    print("^2[LOOT SIMULATE]^7 Would award " .. xpReward .. " XP" .. bonusText)
+    
+    VORPcore.NotifyRightTip(_source, "~g~Simulation complete: " .. xpReward .. " XP" .. (hasBonusLoot and " (BONUS!)" or ""), 4000)
+end)
+
+-- Debug command to check player's axe tier
+RegisterCommand('checkaxe', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local axeTier = GetPlayerAxeTier(_source)
+    print("^2[AXE CHECK]^7 Player " .. _source .. " has axe tier: " .. axeTier)
+    
+    -- Show which axes they have
+    print("^2[AXE CHECK]^7 Player's axes:")
+    for axeName, axeData in pairs(Config.Axes) do
+        local success, hasAxe = pcall(function()
+            local item = exports.vorp_inventory:getItem(_source, axeName)
+            return item and item.count and item.count > 0
+        end)
+        
+        if success and hasAxe then
+            print("^3  " .. axeName .. ":^7 Tier " .. axeData.tier .. " ✓")
+        else
+            print("^1  " .. axeName .. ":^7 Tier " .. axeData.tier .. " ✗")
+        end
+    end
+    
+    VORPcore.NotifyRightTip(_source, "~g~Axe tier: " .. axeTier .. " - Check console for details", 3000)
+end)
+
+-- Command to validate loot system configuration
+RegisterCommand('validateloot', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 /validateloot is for in-game players only")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    print("^2[LOOT VALIDATION]^7 Validating loot system configuration...")
+    
+    local isValid = AtlasWoodConfig.ValidateLootSystem()
+    
+    if isValid then
+        print("^2[LOOT VALIDATION]^7 ✓ Loot system configuration is valid")
+        VORPcore.NotifyRightTip(_source, "~g~Loot system configuration is valid", 3000)
+    else
+        print("^1[LOOT VALIDATION]^7 ✗ Loot system configuration has errors")
+        VORPcore.NotifyRightTip(_source, "~r~Loot system has configuration errors - check console", 4000)
+    end
+end)
+
+-- Command to test XP scaling across all tiers
+RegisterCommand('testxp', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    print("^2[XP TEST]^7 XP Scaling by Grove Tier and Axe Tier:")
+    print("^2================================================================^7")
+    
+    -- Test XP scaling across all combinations
+    for groveTier = 1, 5 do
+        print("^3Grove Tier " .. groveTier .. ":^7")
+        for axeTier = 1, 5 do
+            local baseXP = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, false)
+            local bonusXP = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, true)
+            local axeName = ""
+            
+            -- Get axe name for display
+            for name, data in pairs(Config.Axes) do
+                if data.tier == axeTier then
+                    axeName = name:gsub("_", " "):gsub("(%a)([%a%d]*)", function(a, b) return a:upper()..b end)
+                    break
+                end
+            end
+            
+            print(string.format("^7  %s (Tier %d): ^2%d XP^7 base | ^6%d XP^7 with bonus (+%d)", 
+                axeName, axeTier, baseXP, bonusXP, (bonusXP - baseXP)))
+        end
+        print("")
+    end
+    
+    print("^2================================================================^7")
+    print("^3Summary:^7")
+    print("^7• Grove tiers double base XP each level (150 → 300 → 600 → 1200 → 2400)")
+    print("^7• Axe tiers provide scaling multipliers (1.0x → 1.1x → 1.2x → 1.3x → 1.5x)")
+    print("^7• Bonus loot awards double XP (2.0x multiplier)")
+    print("^2================================================================^7")
+    
+    VORPcore.NotifyRightTip(_source, "~g~XP scaling test complete - check console", 3000)
+end)
+
 RegisterCommand('listforests', function(source, args)
     local _source = source
     if _source == 0 then
@@ -662,9 +1038,22 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local nodeData = task.nodeData
     print("^2[CHOP FLOW]^7 Marking tree dead - Forest " .. forestId .. " | Tree " .. treeIndex)
 
+    -- Get forest info for loot and XP calculation
+    local forest = GetForestById(forestId)
+    local groveTier = forest and forest.tier or 1
+
+    -- NEW: Process loot rewards and get bonus loot status for XP calculation
+    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier)
+    
+    -- Get player's axe tier for XP calculation
+    local axeTier = GetPlayerAxeTier(_source)
+    
+    -- Calculate XP reward based on grove tier, axe tier, and bonus loot
+    local xpReward = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, hasBonusLoot)
+
     -- Award XP using Atlas_skilling export
     local success, result = pcall(function()
-        return exports['Atlas_skilling']:AddSkillXP(_source, 'woodcutting', Config.ChopXPReward)
+        return exports['Atlas_skilling']:AddSkillXP(_source, 'woodcutting', xpReward)
     end)
 
     if not success then
@@ -672,7 +1061,8 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
         print("^1[Atlas Woodcutting]^7 Make sure Atlas_skilling resource is started and loaded properly")
     else
         if Config.DebugLogging then
-            print("^2[CHOP FLOW]^7 Successfully awarded " .. Config.ChopXPReward .. " woodcutting XP to player " .. _source)
+            local bonusText = hasBonusLoot and " (BONUS XP for double loot!)" or ""
+            print("^2[CHOP FLOW]^7 Successfully awarded " .. xpReward .. " woodcutting XP to player " .. _source .. bonusText)
         end
     end
 
@@ -699,7 +1089,6 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     end
 
     -- Schedule respawn timer
-    local forest = GetForestById(forestId)
     if forest then
         local respawnSeconds = GetRespawnSeconds(forest.tier)
         local timerKey = forestId .. "_" .. treeIndex
