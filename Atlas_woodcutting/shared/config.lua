@@ -37,6 +37,66 @@ AtlasWoodConfig.DebugLogging = true -- Toggle all debug output
 AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
 AtlasWoodConfig.RespawnMinutesPerTier = 20 -- Base respawn time (doubled per tier level)
 
+-- Enhanced Animation System Configuration
+AtlasWoodConfig.Animations = {
+    -- Primary animation scenarios (in order of preference)
+    scenarios = {
+        "WORLD_HUMAN_TREE_CHOP",      -- Primary (most reliable in RedM)
+        "WORLD_HUMAN_GARDENER_PLANT", -- Fallback 1 (digging motion)
+        "WORLD_HUMAN_CROUCH_INSPECT", -- Fallback 2 (basic interaction)
+        "WORLD_HUMAN_STAND_IMPATIENT" -- Final fallback (always works)
+    },
+    
+    -- Animation interruption settings
+    interruption = {
+        maxMovementDistance = 2.5,  -- Max distance player can move before interruption
+        checkInterval = 100,        -- How often to check for interruptions (ms)
+        healthCheckEnabled = true,  -- Cancel if player takes damage
+        combatCheckEnabled = true   -- Cancel if player enters combat
+    },
+    
+    -- Sound effects configuration
+    sounds = {
+        enabled = true,
+        choppingLoop = "ROPE_CUT",                    -- Looping chop sound
+        completionSound = "CHECKPOINT_PERFECT",       -- Success sound
+        interruptionSound = "CHECKPOINT_MISSED",      -- Cancellation sound
+        volume = 0.5                                  -- Sound volume (0.0 - 1.0)
+    },
+    
+    -- Visual effects
+    effects = {
+        particlesEnabled = true,
+        woodChipsEffect = "scr_bike_rear_wheels",     -- Particle effect for wood chips
+        particleScale = 0.8,                          -- Scale of particle effects
+        particleFrequency = 2000                      -- How often to trigger particles (ms)
+    },
+    
+    -- Tool-specific animation variations
+    toolAnimations = {
+        ["crude_axe"] = {
+            speedMultiplier = 1.0,
+            effectsIntensity = 1.0
+        },
+        ["fine_axe"] = {
+            speedMultiplier = 0.95,
+            effectsIntensity = 1.1
+        },
+        ["great_axe"] = {
+            speedMultiplier = 0.9,
+            effectsIntensity = 1.2
+        },
+        ["superior_axe"] = {
+            speedMultiplier = 0.85,
+            effectsIntensity = 1.4
+        },
+        ["legendary_axe"] = {
+            speedMultiplier = 0.8,
+            effectsIntensity = 1.6
+        }
+    }
+}
+
 -- Admin Command Validation
 AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }   -- Forest radius meters
 AtlasWoodConfig.TreeCountRange = { min = 5, max = 25 } -- Trees per forest
@@ -197,6 +257,21 @@ AtlasWoodConfig.TreeModelZOffsets = {
 -- Function to get Z offset for a model (returns default 0.2 if not found)
 function AtlasWoodConfig.GetTreeZOffset(modelName)
     return AtlasWoodConfig.TreeModelZOffsets[modelName] or 0.2
+end
+
+-- Animation system utility functions
+function AtlasWoodConfig.GetToolAnimationConfig(axeName)
+    return AtlasWoodConfig.Animations.toolAnimations[axeName] or AtlasWoodConfig.Animations.toolAnimations["crude_axe"]
+end
+
+function AtlasWoodConfig.CalculateAnimationDuration(baseDuration, axeName)
+    local toolConfig = AtlasWoodConfig.GetToolAnimationConfig(axeName)
+    return math.floor(baseDuration * toolConfig.speedMultiplier)
+end
+
+function AtlasWoodConfig.GetEffectsIntensity(axeName)
+    local toolConfig = AtlasWoodConfig.GetToolAnimationConfig(axeName)
+    return toolConfig.effectsIntensity
 end
 
 -- Loot calculation functions
