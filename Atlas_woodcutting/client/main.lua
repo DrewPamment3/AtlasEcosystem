@@ -387,11 +387,28 @@ AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, ce
     end
 end)
 
+-- Progress bar state
+local isChopping = false
+local choppingProgress = 0.0
+
+-- Render thread for smooth progress bar
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        
+        if isChopping then
+            DrawProgressBar(choppingProgress)
+        end
+    end
+end)
+
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
     print("^2[CHOP FLOW]^7 Setting isBusy = true")
     isBusy = true
+    isChopping = true
+    choppingProgress = 0.0
 
     local playerPed = PlayerPedId()
     local startCoords = GetEntityCoords(playerPed)
@@ -399,53 +416,57 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local duration = AtlasWoodConfig.ChopAnimationTime
     local interrupted = false
 
-    -- Freeze player in place
-    FreezeEntityPosition(playerPed, true)
-    SetEntityInvincible(playerPed, false) -- Keep vulnerable to damage for interruption
+    -- Don't freeze player - let them move but monitor for movement
+    SetEntityInvincible(playerPed, false)
 
     print("^2[CHOP FLOW]^7 Starting scenario: WORLD_HUMAN_TREE_CHOP")
     TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
 
-    -- Progress bar with interruption checking
+    -- Movement and interruption checking thread
     Citizen.CreateThread(function()
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
-            local progress = math.min((currentTime - startTime) / duration, 1.0)
+            choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
             
-            -- Check for interruptions every few frames, not every frame
-            if (currentTime - startTime) % 100 < 50 then  -- Check every 100ms
-                local currentCoords = GetEntityCoords(playerPed)
-                local distance = #(startCoords - currentCoords)
-                
-                -- Check if player moved (more than 1.5 units)
-                if distance > 1.5 then
-                    print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
-                    interrupted = true
-                    break
-                end
-                
-                -- Check if player took damage (health decreased)
-                if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
-                    print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
-                    interrupted = true
-                    break
-                end
+            -- Check for interruptions
+            local currentCoords = GetEntityCoords(playerPed)
+            local distance = #(startCoords - currentCoords)
+            
+            -- Check if player moved (more than 2.0 units - more forgiving)
+            if distance > 2.0 then
+                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far (" .. math.floor(distance) .. " units)")
+                interrupted = true
+                break
             end
             
-            -- Draw progress bar
-            DrawProgressBar(progress)
+            -- Check if player took damage
+            if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
+                print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
+                interrupted = true
+                break
+            end
             
-            Citizen.Wait(16) -- ~60 FPS updates
+            -- Check for movement input (WASD keys)
+            if IsControlPressed(0, 0x8FD015D8) or  -- W (Move Up/Forward)
+               IsControlPressed(0, 0xD27782E3) or  -- S (Move Down/Backward) 
+               IsControlPressed(0, 0x7065027D) or  -- A (Move Left)
+               IsControlPressed(0, 0xB4E465B4) then -- D (Move Right)
+                print("^1[CHOP FLOW]^7 Interrupted - Player pressed movement keys")
+                interrupted = true
+                break
+            end
+            
+            Citizen.Wait(50) -- Check every 50ms
         end
         
         -- Cleanup regardless of completion or interruption
+        isChopping = false
+        choppingProgress = 0.0
         print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
         ClearPedTasks(playerPed)
-        FreezeEntityPosition(playerPed, false)
         
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
-            -- Use TriggerEvent to show notification (client-side)
             TriggerEvent('vorp:TipRight', "~r~Chopping interrupted!", 3000)
             isBusy = false
             -- Don't send finishChop event - no rewards
