@@ -5,31 +5,39 @@ local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
 -- Progress bar drawing function
 local function DrawProgressBar(progress)
-    local barWidth = 0.2
-    local barHeight = 0.02
-    local x = 0.5 - (barWidth / 2)
-    local y = 0.85
+    -- Only draw if progress is valid
+    if not progress or progress < 0 or progress > 1 then
+        return
+    end
     
-    -- Background
-    DrawRect(0.5, y, barWidth, barHeight, 0, 0, 0, 150)
+    local barWidth = 0.25
+    local barHeight = 0.025
+    local x = 0.5
+    local y = 0.8
     
-    -- Progress fill
-    local fillWidth = barWidth * progress
-    DrawRect(0.5 - (barWidth / 2) + (fillWidth / 2), y, fillWidth, barHeight, 0, 255, 0, 200)
+    -- Background (dark)
+    DrawRect(x, y, barWidth, barHeight, 0, 0, 0, 180)
     
-    -- Border
-    DrawRect(0.5, y - (barHeight / 2), barWidth, 0.002, 255, 255, 255, 255) -- Top
-    DrawRect(0.5, y + (barHeight / 2), barWidth, 0.002, 255, 255, 255, 255) -- Bottom
-    DrawRect(0.5 - (barWidth / 2), y, 0.002, barHeight, 255, 255, 255, 255) -- Left
-    DrawRect(0.5 + (barWidth / 2), y, 0.002, barHeight, 255, 255, 255, 255) -- Right
+    -- Progress fill (green)
+    if progress > 0 then
+        local fillWidth = barWidth * progress
+        local fillX = x - (barWidth / 2) + (fillWidth / 2)
+        DrawRect(fillX, y, fillWidth, barHeight - 0.004, 76, 175, 80, 255)
+    end
+    
+    -- Border frame
+    DrawRect(x, y - (barHeight / 2) + 0.001, barWidth, 0.002, 255, 255, 255, 255) -- Top
+    DrawRect(x, y + (barHeight / 2) - 0.001, barWidth, 0.002, 255, 255, 255, 255) -- Bottom
+    DrawRect(x - (barWidth / 2) + 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Left  
+    DrawRect(x + (barWidth / 2) - 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Right
     
     -- Progress text
-    SetTextScale(0.35, 0.35)
+    SetTextScale(0.4, 0.4)
     SetTextColor(255, 255, 255, 255)
     SetTextCentre(true)
     SetTextFontForCurrentCommand(1)
     local progressText = "Chopping... " .. math.floor(progress * 100) .. "%"
-    DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), 0.5, y + 0.035)
+    DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), x, y + 0.04)
 end
 
 -- [[ UI ]]
@@ -402,30 +410,32 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     Citizen.CreateThread(function()
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
-            local progress = (currentTime - startTime) / duration
+            local progress = math.min((currentTime - startTime) / duration, 1.0)
             
-            -- Check for interruptions
-            local currentCoords = GetEntityCoords(playerPed)
-            local distance = #(startCoords - currentCoords)
-            
-            -- Check if player moved (more than 1.5 units)
-            if distance > 1.5 then
-                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
-                interrupted = true
-                break
+            -- Check for interruptions every few frames, not every frame
+            if (currentTime - startTime) % 100 < 50 then  -- Check every 100ms
+                local currentCoords = GetEntityCoords(playerPed)
+                local distance = #(startCoords - currentCoords)
+                
+                -- Check if player moved (more than 1.5 units)
+                if distance > 1.5 then
+                    print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
+                    interrupted = true
+                    break
+                end
+                
+                -- Check if player took damage (health decreased)
+                if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
+                    print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
+                    interrupted = true
+                    break
+                end
             end
             
-            -- Check if player took damage (health decreased)
-            if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
-                print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
-                interrupted = true
-                break
-            end
-            
-            -- Draw progress bar (simple text for now - can be enhanced)
+            -- Draw progress bar
             DrawProgressBar(progress)
             
-            Citizen.Wait(50) -- Update every 50ms
+            Citizen.Wait(16) -- ~60 FPS updates
         end
         
         -- Cleanup regardless of completion or interruption

@@ -1079,6 +1079,35 @@ AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forest
     print("^2[CHOP FLOW]^7 requestStart [SERVER] - Player " ..
     _source .. " | Forest " .. forestId .. " | Tree " .. treeIndex)
 
+    -- Get forest info for level validation
+    local forest = GetForestById(forestId)
+    if not forest then
+        print("^1[CHOP FLOW]^7 ERROR: Forest " .. forestId .. " not found")
+        return
+    end
+    
+    local groveTier = forest.tier
+    
+    -- Check if player meets grove level requirement BEFORE starting animation
+    local success, playerLevel = pcall(function()
+        return exports['Atlas_skilling']:GetSkillLevelSync(_source, 'woodcutting')
+    end)
+    
+    if not success then
+        print("^1[CHOP FLOW]^7 ERROR: Could not get player level")
+        return
+    end
+    
+    -- Check grove unlock requirements
+    local requiredLevel = AtlasWoodConfig.GroveUnlocks[groveTier]
+    if requiredLevel and playerLevel < requiredLevel then
+        print("^3[CHOP FLOW]^7 Player " .. _source .. " level " .. playerLevel .. " cannot access tier " .. groveTier .. " grove (requires level " .. requiredLevel .. ")")
+        VORPcore.NotifyRightTip(_source, "~r~Come back when you improve (Level Required: " .. requiredLevel .. ")", 4000)
+        return -- Stop here - don't start the animation
+    end
+    
+    print("^2[CHOP FLOW]^7 Level check passed - Player level " .. playerLevel .. " can access tier " .. groveTier .. " grove")
+
     local token = "CHOP_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
         token = token,
