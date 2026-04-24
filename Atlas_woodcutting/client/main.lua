@@ -447,9 +447,16 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
 
     -- Movement and interruption checking thread
     Citizen.CreateThread(function()
+        print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
+        
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
             choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
+            
+            -- Debug progress
+            if (currentTime - startTime) % 1000 < 50 then -- Print every second
+                print("^3[CHOP PROGRESS]^7 Progress: " .. math.floor(choppingProgress * 100) .. "%")
+            end
             
             -- Check for interruptions
             local currentCoords = GetEntityCoords(playerPed)
@@ -485,6 +492,7 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
         -- Cleanup regardless of completion or interruption
         isChopping = false
         choppingProgress = 0.0
+        print("^2[CHOP FLOW]^7 Progress thread finished - Interrupted: " .. tostring(interrupted))
         print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
         ClearPedTasks(playerPed)
         
