@@ -3,6 +3,21 @@ local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stum
 local RenderedForests = {} -- Forests currently being rendered
 local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
+-- Progress bar state
+local isChopping = false
+local choppingProgress = 0.0
+
+-- Render thread for smooth progress bar
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        
+        if isChopping then
+            DrawProgressBar(choppingProgress)
+        end
+    end
+end)
+
 -- Progress bar drawing function
 local function DrawProgressBar(progress)
     -- Only draw if progress is valid
@@ -392,21 +407,6 @@ AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, ce
     end
 end)
 
--- Progress bar state
-local isChopping = false
-local choppingProgress = 0.0
-
--- Render thread for smooth progress bar
-Citizen.CreateThread(function()
-    while true do
-        Citizen.Wait(0)
-        
-        if isChopping then
-            DrawProgressBar(choppingProgress)
-        end
-    end
-end)
-
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
@@ -421,36 +421,11 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local duration = AtlasWoodConfig.ChopAnimationTime
     local interrupted = false
 
-    -- Don't freeze player - let them move but monitor for movement
-    SetEntityInvincible(playerPed, false)
+    -- Start basic chopping animation
+    print("^2[CHOP FLOW]^7 Starting chopping animation...")
+    TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
 
-    print("^2[CHOP FLOW]^7 Player ped ID: " .. playerPed)
-    print("^2[CHOP FLOW]^7 Player coords: " .. tostring(startCoords))
-    print("^2[CHOP FLOW]^7 Is ped in any vehicle: " .. tostring(IsPedInAnyVehicle(playerPed, false)))
-    
-    -- Clear any existing tasks first
-    ClearPedTasks(playerPed)
-    Citizen.Wait(100)
-    
-    print("^2[CHOP FLOW]^7 Attempting to start scenario: WORLD_HUMAN_TREE_CHOP_RAYFIRE")
-    local success = TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE", -1, true)
-    print("^2[CHOP FLOW]^7 Scenario start result: " .. tostring(success))
-    
-    -- Wait a moment then check if scenario is active
-    Citizen.Wait(500)
-    print("^2[CHOP FLOW]^7 Is ped using scenario: " .. tostring(IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE")))
-    
-    -- If rayfire doesn't work, try the basic one
-    if not IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE") then
-        print("^1[CHOP FLOW]^7 RAYFIRE scenario failed, trying basic WORLD_HUMAN_TREE_CHOP")
-        ClearPedTasks(playerPed)
-        Citizen.Wait(100)
-        TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
-        Citizen.Wait(500)
-        print("^2[CHOP FLOW]^7 Is ped using basic scenario: " .. tostring(IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP")))
-    end
-
-    -- Movement and interruption checking thread
+    -- Progress thread
     Citizen.CreateThread(function()
         print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
         
@@ -458,59 +433,32 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
             local currentTime = GetGameTimer()
             choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
             
-            -- Debug progress
-            if (currentTime - startTime) % 1000 < 50 then -- Print every second
-                print("^3[CHOP PROGRESS]^7 Progress: " .. math.floor(choppingProgress * 100) .. "%")
-            end
-            
-            -- Check for interruptions
+            -- Check for movement interruption (simple distance check)
             local currentCoords = GetEntityCoords(playerPed)
             local distance = #(startCoords - currentCoords)
             
-            -- Check if player moved (more than 2.0 units - more forgiving)
             if distance > 2.0 then
-                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far (" .. math.floor(distance) .. " units)")
+                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
                 interrupted = true
                 break
             end
             
-            -- Check if player took damage
-            if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
-                print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
-                interrupted = true
-                break
-            end
-            
-            -- Check for movement input (WASD keys)
-            if IsControlPressed(0, 0x8FD015D8) or  -- W (Move Up/Forward)
-               IsControlPressed(0, 0xD27782E3) or  -- S (Move Down/Backward) 
-               IsControlPressed(0, 0x7065027D) or  -- A (Move Left)
-               IsControlPressed(0, 0xB4E465B4) then -- D (Move Right)
-                print("^1[CHOP FLOW]^7 Interrupted - Player pressed movement keys")
-                interrupted = true
-                break
-            end
-            
-            Citizen.Wait(50) -- Check every 50ms
+            Citizen.Wait(100) -- Check every 100ms
         end
         
-        -- Cleanup regardless of completion or interruption
+        -- Cleanup
         isChopping = false
         choppingProgress = 0.0
-        print("^2[CHOP FLOW]^7 Progress thread finished - Interrupted: " .. tostring(interrupted))
-        print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
+        print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
         ClearPedTasks(playerPed)
         
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
-            TriggerEvent('vorp:TipRight', "~r~Chopping interrupted!", 3000)
             isBusy = false
-            -- Don't send finishChop event - no rewards
         else
-            print("^2[CHOP FLOW]^7 Setting isBusy = false, sending finishChop to server")
+            print("^2[CHOP FLOW]^7 Sending finishChop to server")
             isBusy = false
             TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
-            print("^2[CHOP FLOW]^7 finishChop event sent")
         end
     end)
 end)
