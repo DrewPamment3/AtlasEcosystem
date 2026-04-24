@@ -3,22 +3,7 @@ local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stum
 local RenderedForests = {} -- Forests currently being rendered
 local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
--- Progress bar state
-local isChopping = false
-local choppingProgress = 0.0
-
--- Render thread for smooth progress bar
-Citizen.CreateThread(function()
-    while true do
-        Citizen.Wait(0)
-        
-        if isChopping then
-            DrawProgressBar(choppingProgress)
-        end
-    end
-end)
-
--- Progress bar drawing function
+-- Progress bar drawing function (define first)
 local function DrawProgressBar(progress)
     -- Only draw if progress is valid
     if not progress or progress < 0 or progress > 1 then
@@ -54,6 +39,21 @@ local function DrawProgressBar(progress)
     local progressText = "Chopping... " .. math.floor(progress * 100) .. "%"
     DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), x, y + 0.04)
 end
+
+-- Progress bar state
+local isChopping = false
+local choppingProgress = 0.0
+
+-- Render thread for smooth progress bar
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        
+        if isChopping then
+            DrawProgressBar(choppingProgress)
+        end
+    end
+end)
 
 -- [[ UI ]]
 local function DrawWoodcuttingPrompt()
@@ -432,6 +432,13 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
             choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
+            
+            -- Debug: Print progress every second
+            local elapsedTime = currentTime - startTime
+            if elapsedTime % 1000 < 100 then -- Every ~1 second
+                print("^3[PROGRESS DEBUG]^7 " .. math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
+                print("^3[PROGRESS DEBUG]^7 isChopping: " .. tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
+            end
             
             -- Check for movement interruption (simple distance check)
             local currentCoords = GetEntityCoords(playerPed)
