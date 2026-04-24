@@ -152,38 +152,64 @@ function GetSkillLevel(source, skill, callback)
     return 1
 end
 
--- Synchronous version using a different approach for immediate needs
+-- Synchronous version - using a blocking wait approach since scalar_sync doesn't exist
 function GetSkillLevelSync(source, skill)
+    print("^3[GetSkillLevelSync DEBUG]^7 === FUNCTION CALLED ===")
+    print("^3[GetSkillLevelSync DEBUG]^7 Source: " .. tostring(source))
+    print("^3[GetSkillLevelSync DEBUG]^7 Skill: " .. tostring(skill))
+    
     local User = VORPcore.getUser(source)
     if not User then 
         print("^1[GetSkillLevelSync]^7 No user found for source " .. source)
         return 1 
     end
+    
+    print("^3[GetSkillLevelSync DEBUG]^7 User found: " .. tostring(User))
 
     local Character = User.getUsedCharacter
     if not Character then 
         print("^1[GetSkillLevelSync]^7 No character found for source " .. source)
         return 1 
     end
+    
+    print("^3[GetSkillLevelSync DEBUG]^7 Character found")
 
+    -- Debug character info
+    print("^3[GetSkillLevelSync DEBUG]^7 Character object keys:")
+    for k, v in pairs(Character) do
+        print("^3[GetSkillLevelSync DEBUG]^7   " .. k .. " = " .. tostring(v))
+    end
+    
     local charidentifier = Character.charIdentifier
     local skillColumn = string.lower(skill) .. "_xp"
     
-    print("^3[GetSkillLevelSync DEBUG]^7 Checking " .. skillColumn .. " for charID " .. charidentifier)
+    print("^3[GetSkillLevelSync DEBUG]^7 Checking " .. skillColumn .. " for charID " .. tostring(charidentifier))
+    print("^3[GetSkillLevelSync DEBUG]^7 === STARTING DATABASE QUERY ===")
     
-    -- Try scalar_sync first, fallback to regular scalar if it doesn't exist
-    local success, currentXP = pcall(function()
-        return exports.oxmysql:scalar_sync('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', 
-            { charidentifier })
-    end)
-
-    if not success then
-        print("^1[GetSkillLevelSync]^7 scalar_sync failed, error: " .. tostring(currentXP))
-        print("^3[GetSkillLevelSync]^7 Falling back to regular scalar (will return 1)")
+    -- Use a promise-based approach since scalar_sync doesn't exist
+    local currentXP = nil
+    local completed = false
+    
+    exports.oxmysql:scalar('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', 
+        { charidentifier }, function(result)
+            currentXP = result
+            completed = true
+            print("^3[GetSkillLevelSync DEBUG]^7 Async callback received XP: " .. tostring(result))
+        end)
+    
+    -- Wait for the callback (with timeout)
+    local timeout = 0
+    while not completed and timeout < 100 do -- 1 second timeout
+        Citizen.Wait(10)
+        timeout = timeout + 1
+    end
+    
+    if not completed then
+        print("^1[GetSkillLevelSync]^7 Database query timed out after 1 second")
         return 1
     end
-
-    print("^3[GetSkillLevelSync DEBUG]^7 Retrieved XP: " .. tostring(currentXP))
+    
+    print("^3[GetSkillLevelSync DEBUG]^7 Final retrieved XP: " .. tostring(currentXP))
     
     if currentXP and currentXP > 0 then
         local level = math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
