@@ -162,16 +162,19 @@ local function AwardLoot(source, woodType, quantity, isBonus)
     end)
     
     if success then
-        -- Get display name for notification
+        -- Clean display name (remove wood_ prefix and clean up)
         local displayName = woodType:gsub("wood_", ""):gsub("_", " ")
         displayName = displayName:sub(1,1):upper() .. displayName:sub(2) .. " Wood"
         
-        local bonusText = isBonus and " (Bonus)" or ""
-        local quantityText = quantity > 1 and (" x" .. quantity) or ""
-        
-        VORPcore.NotifyRightTip(source, "~g~Received: " .. displayName .. quantityText .. bonusText, 3000)
+        -- Simple, clean notification format
+        if isBonus then
+            VORPcore.NotifyRightTip(source, "~g~+" .. quantity .. " " .. displayName .. " ~y~(Bonus)", 3000)
+        else
+            VORPcore.NotifyRightTip(source, "~g~+" .. quantity .. " " .. displayName, 3000)
+        end
         
         if Config.DebugLogging then
+            local bonusText = isBonus and " (Bonus)" or ""
             print("^2[LOOT AWARD]^7 Player " .. source .. " received " .. quantity .. "x " .. woodType .. bonusText)
         end
         

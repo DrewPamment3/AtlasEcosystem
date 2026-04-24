@@ -18,11 +18,11 @@ local function DrawProgressBar(progress)
     -- Background (dark)
     DrawRect(x, y, barWidth, barHeight, 0, 0, 0, 180)
     
-    -- Progress fill (green)
+    -- Progress fill (brown/wood color)
     if progress > 0 then
         local fillWidth = barWidth * progress
         local fillX = x - (barWidth / 2) + (fillWidth / 2)
-        DrawRect(fillX, y, fillWidth, barHeight - 0.004, 76, 175, 80, 255)
+        DrawRect(fillX, y, fillWidth, barHeight - 0.004, 139, 94, 60, 255) -- Brown wood color
     end
     
     -- Border frame
