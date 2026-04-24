@@ -49,6 +49,23 @@ SCRIPT ERROR: @Atlas_skilling/server/main.lua:133: No such export scalar_await i
 - Atlas_woodcutting now uses `GetSkillLevelSync` for immediate level checks
 - Original `GetSkillLevel` kept for backward compatibility with callback pattern
 
+### 4. ❌ Trees Not Spawning When Forests Created - FIXED ✅
+
+**Problem:** When admins created forests:
+- Players got subscribed to forests correctly 
+- But trees wouldn't spawn until reconnect
+- 15-second subscription updates didn't trigger tree spawning for new forests
+
+**Root Cause:**
+1. `updateSubscriptions` only managed subscription lists but didn't trigger tree spawning for newly discovered forests
+2. When admins created forests, existing players weren't immediately notified
+3. Players had to wait for subscription update AND reconnect to see trees
+
+**Fix Applied:**
+1. **Enhanced updateSubscriptions**: Now detects when new forests are discovered and triggers `loadForests`
+2. **Immediate notification**: When forests are created, all nearby players are instantly notified and get trees
+3. **Added NotifyPlayersOfNewForest function**: Checks all players within range and forces subscription updates
+
 ---
 
 ## Required Setup Steps
@@ -91,10 +108,10 @@ Test the fixes:
    /givexp [id] [skill] [amount] - Should work without scalar_await error
    ```
 
-3. **Woodcutting:**
+3. **Forest Creation & Tree Spawning:**
    ```
    /createforest 20 10 1 p_tree_pine01x "Test Forest"
-   # Should create forest and award XP without GetSkillLevel errors
+   # Should create forest, notify nearby players, and spawn trees immediately
    ```
 
 4. **Inventory:**
@@ -166,6 +183,56 @@ local success, playerLevel = pcall(function()
 end)
 ```
 
+#### Tree Spawning Fix:
+```lua
+-- NEW: Enhanced updateSubscriptions with new forest detection
+RegisterServerEvent('atlas_woodcutting:server:updateSubscriptions')
+AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
+    -- ... existing code ...
+    
+    -- Track current subscriptions BEFORE update
+    local currentSubscriptions = {}
+    for forestId, clients in pairs(ForestClients) do
+        if clients[_source] then
+            currentSubscriptions[forestId] = true
+        end
+    end
+    
+    local closestForests = SubscribePlayerToForests(_source, playerCoords)
+    
+    -- Check if any NEW forests were discovered
+    local newForests = {}
+    for _, forest in ipairs(closestForests) do
+        if not currentSubscriptions[forest.id] then
+            table.insert(newForests, forest)
+        end
+    end
+    
+    -- If new forests discovered, send full forest data
+    if #newForests > 0 then
+        TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
+    end
+end)
+
+-- NEW: Immediate notification when forests are created
+local function NotifyPlayersOfNewForest(forestId, forestCoords, radius, tier, name)
+    local players = GetPlayers()
+    for _, playerId in ipairs(players) do
+        local playerSource = tonumber(playerId)
+        if playerSource then
+            -- Check if player is within range
+            local distance = GetDistance(playerCoords, forestCoords)
+            if distance <= Config.RenderDistance then
+                -- Force immediate subscription update and tree loading
+                local closestForests = SubscribePlayerToForests(playerSource, playerCoords)
+                TriggerClientEvent('atlas_woodcutting:client:loadForests', playerSource, closestForests, GlobalNodes, ForestTreeStates)
+                VORPcore.NotifyRightTip(playerSource, "~b~New forest discovered: " .. name, 3000)
+            end
+        end
+    end
+end
+```
+
 ---
 
 ## Common Issues & Solutions
@@ -185,6 +252,12 @@ end)
 2. Check that the fxmanifest.lua includes the new export
 3. Ensure Atlas_skilling loads before Atlas_woodcutting
 
+### Issue: Trees still not spawning when forests are created
+**Solution:**
+1. Check if players are within Config.RenderDistance (400m default) of the new forest
+2. Verify debug logging shows "New forest discovered" messages
+3. Test by disconnecting/reconnecting - if trees appear then, the notification system needs debugging
+
 ### Issue: Admin commands don't work
 **Solution:**
 1. Set your character group to admin:
@@ -203,6 +276,8 @@ end)
 - [ ] Axe items can be given via `/give` command
 - [ ] Wood items can be given via `/give` command
 - [ ] `/createforest` works without GetSkillLevel errors
+- [ ] **NEW:** Trees spawn immediately when forests are created (no reconnect needed)
+- [ ] **NEW:** Players within 400m get "New forest discovered" notification
 - [ ] Chopping trees awards XP without errors
 - [ ] Loot system works and gives appropriate wood types
 
@@ -213,22 +288,17 @@ end)
 - `GetSkillLevelSync` should only be used when you need immediate results
 - For non-critical operations, use the async `GetSkillLevel` with callback
 - The sync version uses blocking database calls, so use sparingly
+- The new forest notification system checks all players when forests are created - consider optimizing for high-player-count servers
 
 ---
 
 ## Emergency Rollback
 
-If issues persist, you can temporarily use a fallback in Atlas_woodcutting:
+If issues persist, you can temporarily disable the new notification system by commenting out the NotifyPlayersOfNewForest call in the createforest command:
 
 ```lua
--- Temporary fallback in ProcessWoodcuttingLoot function
-local playerLevel = 1  -- Default to level 1
-local success, level = pcall(function()
-    return exports['Atlas_skilling']:GetSkillLevelSync(source, 'woodcutting')
-end)
-if success and level then
-    playerLevel = level
-end
+-- Temporary disable
+-- NotifyPlayersOfNewForest(fId, pCoords, radius, tier, name)
 ```
 
-This ensures the woodcutting system continues working even if skill level detection fails.
+This will revert to the old behavior where players need to wait for subscription updates or reconnect to see new forests.

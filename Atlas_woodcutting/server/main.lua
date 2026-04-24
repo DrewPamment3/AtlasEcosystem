@@ -347,6 +347,45 @@ local function SubscribePlayerToForests(playerId, playerCoords)
     return closestForests
 end
 
+-- Notify all players within range when a new forest is created
+local function NotifyPlayersOfNewForest(forestId, forestCoords, radius, tier, name)
+    if Config.DebugLogging then
+        print("^2[NEW FOREST NOTIFY]^7 Checking all players for proximity to new forest " .. forestId)
+    end
+    
+    -- Get all connected players
+    local players = GetPlayers()
+    for _, playerId in ipairs(players) do
+        local playerSource = tonumber(playerId)
+        if playerSource then
+            local user = VORPcore.getUser(playerSource)
+            if user and user.getUsedCharacter then
+                local ped = GetPlayerPed(playerSource)
+                if ped ~= 0 then
+                    local playerCoords = GetEntityCoords(ped)
+                    local distance = GetDistance(playerCoords.x, playerCoords.y, playerCoords.z, 
+                                               forestCoords.x, forestCoords.y, forestCoords.z)
+                    
+                    if distance <= Config.RenderDistance then
+                        if Config.DebugLogging then
+                            print("^2[NEW FOREST NOTIFY]^7 Player " .. playerSource .. " is within range (" .. 
+                                  math.floor(distance) .. "m) - triggering subscription update")
+                        end
+                        
+                        -- Trigger immediate subscription update for this player
+                        -- Force an immediate subscription check for new forests
+                        local closestForests = SubscribePlayerToForests(playerSource, playerCoords)
+                        TriggerClientEvent('atlas_woodcutting:client:loadForests', playerSource, closestForests, GlobalNodes, ForestTreeStates)
+                        
+                        -- Also notify them about the new forest
+                        VORPcore.NotifyRightTip(playerSource, "~b~New forest discovered: " .. name, 3000)
+                    end
+                end
+            end
+        end
+    end
+end
+
 RegisterServerEvent('atlas_woodcutting:server:playerLoaded')
 AddEventHandler('atlas_woodcutting:server:playerLoaded', function()
     local _source = source
@@ -382,11 +421,39 @@ AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
     if ped == 0 then return end
 
     local playerCoords = GetEntityCoords(ped)
-    -- Just update subscriptions, don't send full loadForests event
+    
+    -- Track current subscriptions BEFORE update
+    local currentSubscriptions = {}
+    for forestId, clients in pairs(ForestClients) do
+        if clients[_source] then
+            currentSubscriptions[forestId] = true
+        end
+    end
+    
+    -- Update subscriptions and get new forest list
     local closestForests = SubscribePlayerToForests(_source, playerCoords)
+    
+    -- Check if any NEW forests were added to subscription
+    local newForests = {}
+    for _, forest in ipairs(closestForests) do
+        if not currentSubscriptions[forest.id] then
+            table.insert(newForests, forest)
+            if Config.DebugLogging then
+                print("^2[SUBSCRIPTIONS]^7 Player " .. _source .. " discovered NEW forest: " .. forest.id)
+            end
+        end
+    end
+    
+    -- If new forests discovered, send them the full forest data
+    if #newForests > 0 then
+        TriggerClientEvent('atlas_woodcutting:client:loadForests', _source, closestForests, GlobalNodes, ForestTreeStates)
+        if Config.DebugLogging then
+            print("^2[SUBSCRIPTIONS]^7 Sent loadForests to player " .. _source .. " for " .. #newForests .. " new forests")
+        end
+    end
+    
     if Config.DebugLogging then
-        print("^3[SUBSCRIPTIONS]^7 Updated player " ..
-        _source .. " subscriptions - " .. #closestForests .. " forests in range")
+        print("^3[SUBSCRIPTIONS]^7 Updated player " .. _source .. " subscriptions - " .. #closestForests .. " forests in range")
     end
 end)
 
@@ -514,6 +581,9 @@ RegisterCommand('createforest', function(source, args)
                     if Config.DebugLogging then
                         print("^2[CREATE FOREST]^7 GlobalForests refreshed after creating forest ID " .. fId)
                     end
+                    
+                    -- Notify all existing players about the new forest
+                    NotifyPlayersOfNewForest(fId, pCoords, radius, tier, name)
                 end)
                 
                 VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
