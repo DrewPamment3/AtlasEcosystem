@@ -9,28 +9,28 @@ local function DrawProgressBar(progress)
     if not progress or progress < 0 or progress > 1 then
         return
     end
-    
+
     local barWidth = 0.25
     local barHeight = 0.025
     local x = 0.5
     local y = 0.8
-    
+
     -- Background (dark)
     DrawRect(x, y, barWidth, barHeight, 0, 0, 0, 180)
-    
+
     -- Progress fill (brown/wood color)
     if progress > 0 then
         local fillWidth = barWidth * progress
         local fillX = x - (barWidth / 2) + (fillWidth / 2)
         DrawRect(fillX, y, fillWidth, barHeight - 0.004, 139, 94, 60, 255) -- Brown wood color
     end
-    
+
     -- Border frame
     DrawRect(x, y - (barHeight / 2) + 0.001, barWidth, 0.002, 255, 255, 255, 255) -- Top
     DrawRect(x, y + (barHeight / 2) - 0.001, barWidth, 0.002, 255, 255, 255, 255) -- Bottom
-    DrawRect(x - (barWidth / 2) + 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Left  
+    DrawRect(x - (barWidth / 2) + 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Left
     DrawRect(x + (barWidth / 2) - 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Right
-    
+
     -- Progress text
     SetTextScale(0.4, 0.4)
     SetTextColor(255, 255, 255, 255)
@@ -48,7 +48,7 @@ local choppingProgress = 0.0
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        
+
         if isChopping then
             DrawProgressBar(choppingProgress)
         end
@@ -151,17 +151,18 @@ Citizen.CreateThread(function()
                 DrawWoodcuttingPrompt()
                 if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
                     print("^2[INTERACTION DEBUG]^7 G key pressed! Starting chop request")
-                    print("^2[INTERACTION DEBUG]^7 Forest: " .. matchedNode.forestId .. " | Tree: " .. matchedNode.treeIndex)
+                    print("^2[INTERACTION DEBUG]^7 Forest: " ..
+                    matchedNode.forestId .. " | Tree: " .. matchedNode.treeIndex)
                     print("^2[INTERACTION DEBUG]^7 isBusy: " .. tostring(isBusy))
                     print("^2[INTERACTION DEBUG]^7 Sending requestStart event to server...")
-                    
+
                     TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
                         matchedNode.treeIndex, {
                             x = matchedNode.coords.x,
                             y = matchedNode.coords.y,
                             z = matchedNode.coords.z
                         })
-                    
+
                     print("^2[INTERACTION DEBUG]^7 requestStart event sent!")
                 end
             end
@@ -427,42 +428,44 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
 
     -- Start basic chopping animation (REVERT TO ORIGINAL WORKING VERSION)
     print("^2[CHOP FLOW]^7 Starting chopping animation...")
-    TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
+    TaskStartScenarioInPlace(playerPed, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
 
     -- Progress thread (REVERT TO ORIGINAL WORKING VERSION)
     Citizen.CreateThread(function()
         print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
-        
+
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
             choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
-            
+
             -- Debug: Print progress every second
             local elapsedTime = currentTime - startTime
             if elapsedTime % 1000 < 100 then -- Every ~1 second
-                print("^3[PROGRESS DEBUG]^7 " .. math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
-                print("^3[PROGRESS DEBUG]^7 isChopping: " .. tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
+                print("^3[PROGRESS DEBUG]^7 " ..
+                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
+                print("^3[PROGRESS DEBUG]^7 isChopping: " ..
+                tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
             end
-            
+
             -- Check for movement interruption (simple distance check)
             local currentCoords = GetEntityCoords(playerPed)
             local distance = #(startCoords - currentCoords)
-            
+
             if distance > 2.0 then
                 print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
                 interrupted = true
                 break
             end
-            
+
             Citizen.Wait(100) -- Check every 100ms
         end
-        
+
         -- Cleanup
         isChopping = false
         choppingProgress = 0.0
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
         ClearPedTasks(playerPed)
-        
+
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
             isBusy = false
