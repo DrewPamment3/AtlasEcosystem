@@ -168,9 +168,9 @@ local function AwardLoot(source, woodType, quantity, isBonus)
         
         -- Simple, clean notification format
         if isBonus then
-            VORPcore.NotifyRightTip(source, "~g~+" .. quantity .. " " .. displayName .. " ~y~(Bonus)", 3000)
+            VORPcore.NotifyRightTip(source, "+" .. quantity .. " " .. displayName .. " (Bonus)", 3000)
         else
-            VORPcore.NotifyRightTip(source, "~g~+" .. quantity .. " " .. displayName, 3000)
+            VORPcore.NotifyRightTip(source, "+" .. quantity .. " " .. displayName, 3000)
         end
         
         if Config.DebugLogging then
