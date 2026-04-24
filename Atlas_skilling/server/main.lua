@@ -155,24 +155,43 @@ end
 -- Synchronous version using a different approach for immediate needs
 function GetSkillLevelSync(source, skill)
     local User = VORPcore.getUser(source)
-    if not User then return 1 end
+    if not User then 
+        print("^1[GetSkillLevelSync]^7 No user found for source " .. source)
+        return 1 
+    end
 
     local Character = User.getUsedCharacter
-    if not Character then return 1 end
+    if not Character then 
+        print("^1[GetSkillLevelSync]^7 No character found for source " .. source)
+        return 1 
+    end
 
     local charidentifier = Character.charIdentifier
     local skillColumn = string.lower(skill) .. "_xp"
     
-    -- This is a blocking call - use only when absolutely necessary
+    print("^3[GetSkillLevelSync DEBUG]^7 Checking " .. skillColumn .. " for charID " .. charidentifier)
+    
+    -- Try scalar_sync first, fallback to regular scalar if it doesn't exist
     local success, currentXP = pcall(function()
         return exports.oxmysql:scalar_sync('SELECT ' .. skillColumn .. ' FROM character_skills WHERE charidentifier = ?', 
             { charidentifier })
     end)
 
-    if success and currentXP then
-        return math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
+    if not success then
+        print("^1[GetSkillLevelSync]^7 scalar_sync failed, error: " .. tostring(currentXP))
+        print("^3[GetSkillLevelSync]^7 Falling back to regular scalar (will return 1)")
+        return 1
     end
 
+    print("^3[GetSkillLevelSync DEBUG]^7 Retrieved XP: " .. tostring(currentXP))
+    
+    if currentXP and currentXP > 0 then
+        local level = math.floor(math.sqrt(currentXP / Config.XPFormulaDivisor)) + 1
+        print("^2[GetSkillLevelSync DEBUG]^7 Calculated level: " .. level .. " (from " .. currentXP .. " XP)")
+        return level
+    end
+
+    print("^1[GetSkillLevelSync]^7 No XP found or XP is 0, returning level 1")
     return 1
 end
 

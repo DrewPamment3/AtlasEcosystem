@@ -3,6 +3,35 @@ local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stum
 local RenderedForests = {} -- Forests currently being rendered
 local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
+-- Progress bar drawing function
+local function DrawProgressBar(progress)
+    local barWidth = 0.2
+    local barHeight = 0.02
+    local x = 0.5 - (barWidth / 2)
+    local y = 0.85
+    
+    -- Background
+    DrawRect(0.5, y, barWidth, barHeight, 0, 0, 0, 150)
+    
+    -- Progress fill
+    local fillWidth = barWidth * progress
+    DrawRect(0.5 - (barWidth / 2) + (fillWidth / 2), y, fillWidth, barHeight, 0, 255, 0, 200)
+    
+    -- Border
+    DrawRect(0.5, y - (barHeight / 2), barWidth, 0.002, 255, 255, 255, 255) -- Top
+    DrawRect(0.5, y + (barHeight / 2), barWidth, 0.002, 255, 255, 255, 255) -- Bottom
+    DrawRect(0.5 - (barWidth / 2), y, 0.002, barHeight, 255, 255, 255, 255) -- Left
+    DrawRect(0.5 + (barWidth / 2), y, 0.002, barHeight, 255, 255, 255, 255) -- Right
+    
+    -- Progress text
+    SetTextScale(0.35, 0.35)
+    SetTextColor(255, 255, 255, 255)
+    SetTextCentre(true)
+    SetTextFontForCurrentCommand(1)
+    local progressText = "Chopping... " .. math.floor(progress * 100) .. "%"
+    DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), 0.5, y + 0.035)
+end
+
 -- [[ UI ]]
 local function DrawWoodcuttingPrompt()
     local x, y = 0.5, 0.92
@@ -356,17 +385,65 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 Setting isBusy = true")
     isBusy = true
 
+    local playerPed = PlayerPedId()
+    local startCoords = GetEntityCoords(playerPed)
+    local startTime = GetGameTimer()
+    local duration = AtlasWoodConfig.ChopAnimationTime
+    local interrupted = false
+
+    -- Freeze player in place
+    FreezeEntityPosition(playerPed, true)
+    SetEntityInvincible(playerPed, false) -- Keep vulnerable to damage for interruption
+
     print("^2[CHOP FLOW]^7 Starting scenario: WORLD_HUMAN_TREE_CHOP")
-    TaskStartScenarioInPlace(PlayerPedId(), `WORLD_HUMAN_TREE_CHOP`, -1, true)
+    TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
 
-    print("^2[CHOP FLOW]^7 Waiting " .. AtlasWoodConfig.ChopAnimationTime .. "ms for animation")
-    Citizen.Wait(AtlasWoodConfig.ChopAnimationTime)
-
-    print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
-    ClearPedTasks(PlayerPedId())
-
-    print("^2[CHOP FLOW]^7 Setting isBusy = false, sending finishChop to server")
-    isBusy = false
-    TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
-    print("^2[CHOP FLOW]^7 finishChop event sent")
+    -- Progress bar with interruption checking
+    Citizen.CreateThread(function()
+        while GetGameTimer() - startTime < duration and not interrupted do
+            local currentTime = GetGameTimer()
+            local progress = (currentTime - startTime) / duration
+            
+            -- Check for interruptions
+            local currentCoords = GetEntityCoords(playerPed)
+            local distance = #(startCoords - currentCoords)
+            
+            -- Check if player moved (more than 1.5 units)
+            if distance > 1.5 then
+                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
+                interrupted = true
+                break
+            end
+            
+            -- Check if player took damage (health decreased)
+            if GetEntityHealth(playerPed) < GetEntityMaxHealth(playerPed) then
+                print("^1[CHOP FLOW]^7 Interrupted - Player took damage")
+                interrupted = true
+                break
+            end
+            
+            -- Draw progress bar (simple text for now - can be enhanced)
+            DrawProgressBar(progress)
+            
+            Citizen.Wait(50) -- Update every 50ms
+        end
+        
+        -- Cleanup regardless of completion or interruption
+        print("^2[CHOP FLOW]^7 Animation complete, clearing tasks")
+        ClearPedTasks(playerPed)
+        FreezeEntityPosition(playerPed, false)
+        
+        if interrupted then
+            print("^1[CHOP FLOW]^7 Chopping interrupted!")
+            -- Use TriggerEvent to show notification (client-side)
+            TriggerEvent('vorp:TipRight', "~r~Chopping interrupted!", 3000)
+            isBusy = false
+            -- Don't send finishChop event - no rewards
+        else
+            print("^2[CHOP FLOW]^7 Setting isBusy = false, sending finishChop to server")
+            isBusy = false
+            TriggerServerEvent('atlas_woodcutting:server:finishChop', token)
+            print("^2[CHOP FLOW]^7 finishChop event sent")
+        end
+    end)
 end)
