@@ -234,6 +234,154 @@ end)
 
 ---
 
+---
+
+## 14. OxMySQL Export Names - CRITICAL ERROR PATTERN
+
+**Mistake:** Using non-existent oxmysql export functions
+
+- ❌ `exports.oxmysql:scalar_await()` - **DOES NOT EXIST** (causes script crash)
+- ❌ Assuming all oxmysql versions have same exports
+
+**Correct Approach:**
+
+- ✅ Use `exports.oxmysql:scalar()` with callback for async:
+  ```lua
+  exports.oxmysql:scalar('SELECT ...', {params}, function(result)
+      -- Handle result in callback
+  end)
+  ```
+- ✅ Use `exports.oxmysql:scalar_sync()` for synchronous (when available):
+  ```lua
+  local success, result = pcall(function()
+      return exports.oxmysql:scalar_sync('SELECT ...', {params})
+  end)
+  ```
+- ✅ Always wrap database calls in pcall() to handle version differences
+- ⚠️ **This error causes complete script failure** - test thoroughly
+
+---
+
+## 15. Animation Systems in RedM vs GTA V
+
+**Mistake:** Assuming GTA V animations work in RedM
+
+- ❌ `WORLD_HUMAN_TREE_CHOP_RAYFIRE` may not exist in RedM
+- ❌ Many complex GTA V scenarios are not available
+- ❌ Animations fail silently - no error messages
+
+**Correct Approach:**
+
+- ✅ Use basic, proven scenarios: `WORLD_HUMAN_TREE_CHOP`
+- ✅ Always have fallback scenarios:
+  ```lua
+  if not IsPedUsingScenario(ped, "ADVANCED_SCENARIO") then
+      TaskStartScenarioInPlace(ped, "BASIC_SCENARIO", -1, true)
+  end
+  ```
+- ✅ Test all animations thoroughly on actual RedM server
+- ⚠️ Scenarios failing can break entire interaction flow
+
+---
+
+## 16. Progress Bar Rendering Order Issues
+
+**Mistake:** Defining functions after they're called in threads
+
+- ❌ Calling `DrawProgressBar()` before function is defined
+- ❌ Starting render threads before all functions exist
+
+**Correct Approach:**
+
+- ✅ Define ALL functions BEFORE starting threads:
+  ```lua
+  -- Define function FIRST
+  local function DrawProgressBar(progress)
+      -- Function code
+  end
+  
+  -- THEN start thread that uses it
+  Citizen.CreateThread(function()
+      DrawProgressBar(progress)
+  end)
+  ```
+- ✅ Use separate render thread at `Citizen.Wait(0)` for smooth UI
+- ✅ Validate all parameters before drawing operations
+
+---
+
+## 17. Event Flow Chain Debugging
+
+**Mistake:** Not tracking complete event flow through system
+
+- ❌ Only debugging one side (client OR server)
+- ❌ Assuming events are received if they're sent
+- ❌ No unique identifiers to track specific interactions
+
+**Correct Approach:**
+
+- ✅ Debug COMPLETE flow: `client → server → client`
+- ✅ Use unique tokens/IDs to trace interactions:
+  ```lua
+  -- Server
+  local token = "CHOP_" .. math.random(1000, 9999)
+  print("Sending token: " .. token)
+  TriggerClientEvent('event', source, token)
+  
+  -- Client  
+  AddEventHandler('event', function(token)
+      print("Received token: " .. token) -- Should match!
+  end)
+  ```
+- ✅ Log both successful operations AND errors
+- ✅ Remove debug prints in production
+
+---
+
+## 18. Forest Subscription Timing Issues
+
+**Mistake:** Relying only on periodic updates for real-time changes
+
+- ❌ 15-second subscription updates too slow for admin commands
+- ❌ Players don't see new forests until next update cycle
+- ❌ No immediate notification system
+
+**Correct Approach:**
+
+- ✅ Immediate notification for real-time changes:
+  ```lua
+  -- When admin creates forest
+  local closestForests = SubscribePlayerToForests(playerId, coords)
+  TriggerClientEvent('loadForests', playerId, closestForests, nodes, states)
+  ```
+- ✅ Keep periodic updates for position changes
+- ✅ Combine both systems for best user experience
+
+---
+
+## 19. Progress Thread State Management
+
+**Mistake:** Complex thread logic breaking simple operations
+
+- ❌ Over-complicating progress tracking with multiple conditions
+- ❌ Threading issues causing progress to freeze at 0%
+- ❌ Not validating thread state variables
+
+**Correct Approach:**
+
+- ✅ Keep progress threads SIMPLE:
+  ```lua
+  while GetGameTimer() - startTime < duration and not interrupted do
+      choppingProgress = (GetGameTimer() - startTime) / duration
+      Citizen.Wait(100) -- Simple, reliable
+  end
+  ```
+- ✅ Use separate render thread for UI updates
+- ✅ Always validate progress values (0-1 range)
+- ✅ Add debug prints to track thread execution
+
+---
+
 ## Quick Checklist Before Submitting Code
 
 - [ ] Are you using valid RedM API functions? (Test in RedM docs)
@@ -246,3 +394,8 @@ end)
 - [ ] Are client-only natives (CreateObject, GetGameTimer, etc) only in CLIENT files?
 - [ ] Is your server-side RegisterCommand only doing server logic, not game manipulation?
 - [ ] Are RegisterCommand args being accessed as TABLE directly? (No string parsing, use `args[1]` not `arguments[1]`)
+- [ ] **NEW:** Are you using correct oxmysql export names? (scalar, NOT scalar_await)
+- [ ] **NEW:** Are animations tested on actual RedM server? (Many GTA V scenarios don't exist)
+- [ ] **NEW:** Are functions defined BEFORE threads that call them?
+- [ ] **NEW:** Is complete event flow debugged with unique tokens/IDs?
+- [ ] **NEW:** Are real-time changes immediately notified to players?

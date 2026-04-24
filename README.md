@@ -350,6 +350,37 @@ Each can use the same `AddSkillXP` export to integrate with the core system.
 - **Dynamic Forest Discovery**: New forests are immediately available for subscription after creation
 - **Automatic Cache Management**: GlobalForests and GlobalNodes refresh automatically on forest changes
 
+## 🔧 Critical Technical Lessons
+
+### **Database Export Issues (MAJOR)**
+- ❌ `exports.oxmysql:scalar_await()` **does not exist** - causes critical script errors
+- ✅ Use `exports.oxmysql:scalar()` with callbacks for async operations
+- ✅ Use `exports.oxmysql:scalar_sync()` for synchronous operations (when available)
+- ⚠️ Always pcall() database operations to handle version differences
+
+### **Animation System (RedM Specific)**
+- ❌ Many GTA V animation scenarios don't exist in RedM
+- ❌ `WORLD_HUMAN_TREE_CHOP_RAYFIRE` may not be available in all RedM versions
+- ✅ `WORLD_HUMAN_TREE_CHOP` is the reliable fallback scenario
+- ⚠️ Always test animations thoroughly - they fail silently in many cases
+
+### **Progress Bar Rendering**
+- ❌ Don't define functions after they're called in thread loops
+- ✅ Define DrawProgressBar function BEFORE the render thread
+- ✅ Use separate render thread running at Citizen.Wait(0) for smooth display
+- ⚠️ Validate progress values (0-1 range) to prevent rendering errors
+
+### **Event Flow Debugging**
+- 🔍 Always add debug prints to track event flow: client → server → client
+- 🔍 Use unique tokens/IDs to trace specific interactions through the system
+- 🔍 Log both successful operations AND failures for complete debugging picture
+- ⚠️ Remove debug prints in production for performance
+
+### **Forest Subscription System**
+- ✅ New forest detection works but requires immediate notification to existing players
+- ✅ Use `SubscribePlayerToForests()` + `TriggerClientEvent('loadForests')` for immediate updates
+- ⚠️ 15-second subscription updates are too slow for real-time forest creation
+
 ---
 
 ## 📝 Version History
