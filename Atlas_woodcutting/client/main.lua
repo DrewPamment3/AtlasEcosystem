@@ -419,11 +419,31 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     -- Don't freeze player - let them move but monitor for movement
     SetEntityInvincible(playerPed, false)
 
-    print("^2[CHOP FLOW]^7 Starting scenario: WORLD_HUMAN_TREE_CHOP_RAYFIRE")
-    TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE", -1, true)
-
-    -- Optional: Add some sound effects for immersion
-    -- PlaySoundFrontend("TREE_CHOPPING", "PLAYER_SWITCH_CUSTOM_SOUNDSET", true, 0)
+    print("^2[CHOP FLOW]^7 Player ped ID: " .. playerPed)
+    print("^2[CHOP FLOW]^7 Player coords: " .. tostring(startCoords))
+    print("^2[CHOP FLOW]^7 Is ped in any vehicle: " .. tostring(IsPedInAnyVehicle(playerPed, false)))
+    
+    -- Clear any existing tasks first
+    ClearPedTasks(playerPed)
+    Citizen.Wait(100)
+    
+    print("^2[CHOP FLOW]^7 Attempting to start scenario: WORLD_HUMAN_TREE_CHOP_RAYFIRE")
+    local success = TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE", -1, true)
+    print("^2[CHOP FLOW]^7 Scenario start result: " .. tostring(success))
+    
+    -- Wait a moment then check if scenario is active
+    Citizen.Wait(500)
+    print("^2[CHOP FLOW]^7 Is ped using scenario: " .. tostring(IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE")))
+    
+    -- If rayfire doesn't work, try the basic one
+    if not IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP_RAYFIRE") then
+        print("^1[CHOP FLOW]^7 RAYFIRE scenario failed, trying basic WORLD_HUMAN_TREE_CHOP")
+        ClearPedTasks(playerPed)
+        Citizen.Wait(100)
+        TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_TREE_CHOP", -1, true)
+        Citizen.Wait(500)
+        print("^2[CHOP FLOW]^7 Is ped using basic scenario: " .. tostring(IsPedUsingScenario(playerPed, "WORLD_HUMAN_TREE_CHOP")))
+    end
 
     -- Movement and interruption checking thread
     Citizen.CreateThread(function()
