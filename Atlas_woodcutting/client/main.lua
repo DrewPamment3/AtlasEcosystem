@@ -135,14 +135,19 @@ Citizen.CreateThread(function()
             if matchedNode then
                 DrawWoodcuttingPrompt()
                 if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
-                    print("^2[Atlas Debug]^7 SUCCESS: Interaction for Forest " ..
-                        matchedNode.forestId .. " | Tree " .. matchedNode.treeIndex)
+                    print("^2[INTERACTION DEBUG]^7 G key pressed! Starting chop request")
+                    print("^2[INTERACTION DEBUG]^7 Forest: " .. matchedNode.forestId .. " | Tree: " .. matchedNode.treeIndex)
+                    print("^2[INTERACTION DEBUG]^7 isBusy: " .. tostring(isBusy))
+                    print("^2[INTERACTION DEBUG]^7 Sending requestStart event to server...")
+                    
                     TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
                         matchedNode.treeIndex, {
                             x = matchedNode.coords.x,
                             y = matchedNode.coords.y,
                             z = matchedNode.coords.z
                         })
+                    
+                    print("^2[INTERACTION DEBUG]^7 requestStart event sent!")
                 end
             end
         end
