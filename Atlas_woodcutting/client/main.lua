@@ -598,22 +598,52 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local playerPedLocal = playerPed
     local startCoordsLocal = startCoords
 
-    -- Use the EXACT same TaskStartScenarioInPlace signature as vorp_animations
-    -- (7 params: ped, hash, duration, playIntro, p4, p5, p6)
-    print("^2[CHOP FLOW]^7 Starting chopping scenario (vorp_animations compatible)...")
-    ClearPedTasks(playerPedLocal)
-    Citizen.Wait(50)
-    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration, true, false, false, false)
+    -- Use TaskPlayAnim with a known-working animation dict (standard approach, NOT scenario)
+    -- melee_hatchet or melee_knife@ are reliable across RedM builds
+    print("^2[CHOP FLOW]^7 Starting chopping animation via TaskPlayAnim...")
     
-    -- Verify the scenario actually started
-    Citizen.Wait(200)
-    local scenarioActive = false
-    local scenarioCheck = pcall(function() return IsPedActiveInScenario(playerPedLocal) end)
-    if scenarioCheck then
-        scenarioActive = true
-        print("^2[CHOP FLOW]^7 ✓ Scenario confirmed active via IsPedActiveInScenario")
-    else
-        print("^1[CHOP FLOW]^7 ⚠ IsPedActiveInScenario returned false, but continuing anyway...")
+    local animDict = nil
+    local animName = nil
+    local primaryDict = "melee_hatchet"
+    local primaryAnim = "attack_high_left_slash"
+    local fallbackDict = "melee_knife@"
+    local fallbackAnim = "slash_right"
+    
+    -- Try primary dict first, fall back to secondary
+    if not HasAnimDictLoaded(primaryDict) then
+        RequestAnimDict(primaryDict)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(primaryDict) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+    
+    if HasAnimDictLoaded(primaryDict) then
+        animDict = primaryDict
+        animName = primaryAnim
+        ClearPedTasks(playerPedLocal)
+        Citizen.Wait(50)
+        TaskPlayAnim(playerPedLocal, animDict, animName, 4.0, -4.0, duration, 49, 0, false, false, false)
+        print("^2[CHOP FLOW]^7 ✓ Animation started (" .. animDict .. "/" .. animName .. ")")
+    elseif not HasAnimDictLoaded(fallbackDict) then
+        RequestAnimDict(fallbackDict)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(fallbackDict) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+    
+    if not animDict and HasAnimDictLoaded(fallbackDict) then
+        animDict = fallbackDict
+        animName = fallbackAnim
+        ClearPedTasks(playerPedLocal)
+        Citizen.Wait(50)
+        TaskPlayAnim(playerPedLocal, animDict, animName, 3.0, -3.0, duration, 49, 0, false, false, false)
+        print("^2[CHOP FLOW]^7 ✓ Animation started (fallback: " .. animDict .. "/" .. animName .. ")")
+    end
+    
+    if not animDict then
+        print("^1[CHOP FLOW]^7 ⚠ No animation dicts available, proceeding without animation")
     end
 
     -- Progress thread
@@ -659,6 +689,9 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
         isChopping = false
         choppingProgress = 0.0
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
+        if animDict then
+            StopAnimTask(playerPedLocal, animDict, animName, 1.0)
+        end
         ClearPedTasks(playerPedLocal)
 
         if interrupted then
