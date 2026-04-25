@@ -256,6 +256,101 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
     print("^2[Atlas Debug]^7 Position: (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
 end)
 
+-- [[ ANIMATION TEST COMMAND ]]
+-- Tests various animation approaches to find what works on this RedM build
+RegisterCommand('testanim', function(source, args, rawCommand)
+    local scenarioName = args[1] or "WORLD_HUMAN_TREE_CHOP"
+    local duration = tonumber(args[2]) or 5000
+
+    local ped = PlayerPedId()
+    print("^2[ANIM TEST]^7 ========================================")
+    print("^2[ANIM TEST]^7 Testing animation approaches for: " .. scenarioName)
+    print("^2[ANIM TEST]^7 Duration: " .. duration .. "ms")
+    print("^2[ANIM TEST]^7 ========================================")
+
+    local scenarioHash = GetHashKey(scenarioName)
+    local pCoords = GetEntityCoords(ped)
+
+    -- Test 1: TaskStartScenarioInPlace with playIntro=false
+    print("^3[ANIM TEST]^7 --- Test 1: TaskStartScenarioInPlace, playIntro=FALSE ---")
+    ClearPedTasks(ped)
+    Citizen.Wait(100)
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+    Citizen.Wait(500)
+    local active1 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active1))
+
+    -- Test 2: TaskStartScenarioInPlace with playIntro=true
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 2: TaskStartScenarioInPlace, playIntro=TRUE ---")
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+    Citizen.Wait(500)
+    local active2 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active2))
+
+    -- Test 3: TaskStartScenarioAtPosition with playIntro=false
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 3: TaskStartScenarioAtPosition, playIntro=FALSE ---")
+    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
+    Citizen.Wait(500)
+    local active3 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active3))
+
+    -- Test 4: TaskStartScenarioAtPosition with playIntro=true
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 4: TaskStartScenarioAtPosition, playIntro=TRUE ---")
+    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
+    Citizen.Wait(500)
+    local active4 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active4))
+
+    -- Test 5: Play full scenario with timer (InPlace, playIntro=false)
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 5: Running full " .. (duration/1000) .. "s scenario ---")
+    print("^3[ANIM TEST]^7 Using: TaskStartScenarioInPlace, playIntro=FALSE (most likely to work)")
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+    local startTime = GetGameTimer()
+    while GetGameTimer() - startTime < duration do
+        local stillActive = IsPedUsingScenario(ped, scenarioHash)
+        if GetGameTimer() - startTime > 1000 and not stillActive then
+            print("^1[ANIM TEST]^7 Scenario STOPPED after ~" .. math.floor((GetGameTimer() - startTime)/1000) .. "s!")
+            break
+        end
+        Citizen.Wait(200)
+    end
+    ClearPedTasks(ped)
+    print("^2[ANIM TEST]^7 --- Test 5: Complete ---")
+
+    -- Summary
+    print("^2[ANIM TEST]^7 ========================================")
+    print("^2[ANIM TEST]^7 SUMMARY:")
+    print("^2[ANIM TEST]^7 1. InPlace,  playIntro=false: " .. tostring(active1))
+    print("^2[ANIM TEST]^7 2. InPlace,  playIntro=true:  " .. tostring(active2))
+    print("^2[ANIM TEST]^7 3. AtPos,    playIntro=false: " .. tostring(active3))
+    print("^2[ANIM TEST]^7 4. AtPos,    playIntro=true:  " .. tostring(active4))
+    print("^2[ANIM TEST]^7 ========================================")
+
+    local workingApproaches = {}
+    if active1 then table.insert(workingApproaches, "#1: InPlace, playIntro=false") end
+    if active2 then table.insert(workingApproaches, "#2: InPlace, playIntro=true") end
+    if active3 then table.insert(workingApproaches, "#3: AtPosition, playIntro=false") end
+    if active4 then table.insert(workingApproaches, "#4: AtPosition, playIntro=true") end
+
+    if #workingApproaches > 0 then
+        print("^2[ANIM TEST]^7 ✓ Working approaches: " .. #workingApproaches)
+        for _, approach in ipairs(workingApproaches) do
+            print("^2[ANIM TEST]^7   " .. approach)
+        end
+    else
+        print("^1[ANIM TEST]^7 ✗ NONE of the approaches worked for '" .. scenarioName .. "'")
+        print("^1[ANIM TEST]^7 Try a different scenario name, e.g.: /testanim WORLD_HUMAN_GARDENER_PLANT")
+    end
+end)
+
 -- [[ EVENTS ]]
 RegisterNetEvent('atlas_woodcutting:client:loadForests')
 AddEventHandler('atlas_woodcutting:client:loadForests', function(forests, nodes, forestTreeStates)
