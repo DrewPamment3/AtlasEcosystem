@@ -264,136 +264,164 @@ RegisterCommand('testanim', function(source, args, rawCommand)
 
     local ped = PlayerPedId()
     print("^2[ANIM TEST]^7 ========================================")
-    print("^2[ANIM TEST]^7 Testing animation approaches for: " .. scenarioName)
+    print("^2[ANIM TEST]^7 Testing animations for: " .. scenarioName)
     print("^2[ANIM TEST]^7 Duration: " .. duration .. "ms")
     print("^2[ANIM TEST]^7 ========================================")
 
-    local scenarioHash = GetHashKey(scenarioName)
     local pCoords = GetEntityCoords(ped)
+    local startTime = GetGameTimer()
 
-    -- Helper: safe scenario check (tries multiple native names)
-    local function IsScenarioActive(ped, hash)
-        -- Try IsPedActiveInScenario (RedM)
-        local success, result = pcall(function()
-            return IsPedActiveInScenario(ped)
-        end)
-        if success and type(result) == "boolean" then
-            return result
-        end
-        -- Fallback: just check if ped is still doing *something*
-        return IsPedStill(ped) == false  -- moving/animating = not still
-    end
-
-    local active1, active2, active3, active4 = false, false, false, false
-
-    -- Test 1: TaskStartScenarioInPlace with playIntro=false
-    print("^3[ANIM TEST]^7 --- Test 1: InPlace, playIntro=FALSE ---")
+    -- === APPROACH A: TaskStartScenarioInPlace ===
+    print("^3[ANIM TEST]^7 --- Test A: TaskStartScenarioInPlace ---")
     ClearPedTasks(ped)
     Citizen.Wait(100)
-    local s1, r1 = pcall(function()
-        TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
-    end)
+    pcall(function() TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), duration, false) end)
     Citizen.Wait(500)
-    active1 = IsScenarioActive(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s1) .. " | Scenario active: " .. tostring(active1))
+    local aActive = pcall(function() return IsPedActiveInScenario(ped) end)
+    print("^3[ANIM TEST]^7 IsPedActiveInScenario: " .. tostring(aActive))
 
-    -- Test 2: TaskStartScenarioInPlace with playIntro=true (current code)
+    -- === APPROACH B: TaskStartScenarioAtPosition ===
     ClearPedTasks(ped)
     Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 2: InPlace, playIntro=TRUE ---")
-    local s2, r2 = pcall(function()
-        TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+    print("^3[ANIM TEST]^7 --- Test B: TaskStartScenarioAtPosition ---")
+    pcall(function()
+        TaskStartScenarioAtPosition(ped, GetHashKey(scenarioName), 
+            pCoords.x, pCoords.y, pCoords.z - 0.5, 
+            GetEntityHeading(ped), duration, false, false)
     end)
     Citizen.Wait(500)
-    active2 = IsScenarioActive(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s2) .. " | Scenario active: " .. tostring(active2))
+    local bActive = pcall(function() return IsPedActiveInScenario(ped) end)
+    print("^3[ANIM TEST]^7 IsPedActiveInScenario: " .. tostring(bActive))
 
-    -- Test 3: TaskStartScenarioAtPosition with playIntro=false
+    -- === APPROACH C: Melee upper body animation (clipset-based) ===
+    -- This is a widely-compatible approach using melee_hatchet clips
     ClearPedTasks(ped)
     Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 3: AtPosition, playIntro=FALSE ---")
-    local s3, r3 = pcall(function()
-        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
-    end)
-    Citizen.Wait(500)
-    active3 = IsScenarioActive(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s3) .. " | Scenario active: " .. tostring(active3))
-
-    -- Test 4: TaskStartScenarioAtPosition with playIntro=true
-    ClearPedTasks(ped)
-    Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 4: AtPosition, playIntro=TRUE ---")
-    local s4, r4 = pcall(function()
-        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
-    end)
-    Citizen.Wait(500)
-    active4 = IsScenarioActive(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s4) .. " | Scenario active: " .. tostring(active4))
-
-    -- Test 5: Play full scenario with timer using the best approach
-    ClearPedTasks(ped)
-    Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 5: Running full " .. (duration/1000) .. "s scenario ---")
-    local didStart = false
-    if active1 then
-        print("^3[ANIM TEST]^7 Using #1: InPlace, playIntro=false")
-        TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
-        didStart = true
-    elseif active2 then
-        print("^3[ANIM TEST]^7 Using #2: InPlace, playIntro=true")
-        TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
-        didStart = true
-    elseif active3 then
-        print("^3[ANIM TEST]^7 Using #3: AtPosition, playIntro=false")
-        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
-        didStart = true
-    elseif active4 then
-        print("^3[ANIM TEST]^7 Using #4: AtPosition, playIntro=true")
-        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
-        didStart = true
-    end
-
-    if didStart then
-        local startTime = GetGameTimer()
-        while GetGameTimer() - startTime < duration do
-            local stillActive = IsScenarioActive(ped, scenarioHash)
-            if GetGameTimer() - startTime > 1000 and not stillActive then
-                print("^1[ANIM TEST]^7 Scenario STOPPED after ~" .. math.floor((GetGameTimer() - startTime)/1000) .. "s!")
-                break
-            end
-            Citizen.Wait(200)
+    print("^3[ANIM TEST]^7 --- Test C: Clipset-based melee_hatchet ---")
+    local dict = "melee_hatchet"
+    local anim = "attack_high_left_slash"
+    local dictLoaded = false
+    if not HasAnimDictLoaded(dict) then
+        RequestAnimDict(dict)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
         end
+        dictLoaded = HasAnimDictLoaded(dict)
     else
-        print("^1[ANIM TEST]^7 No approach worked in Tests 1-4, skipping full run")
+        dictLoaded = true
     end
+    print("^3[ANIM TEST]^7 Anim dict loaded: " .. tostring(dictLoaded))
+    if dictLoaded then
+        -- Play the animation once with flag 49 (upper body + hold last frame)
+        pcall(function()
+            TaskPlayAnim(ped, dict, anim, 8.0, -8.0, duration, 49, 0, false, false, false)
+        end)
+        Citizen.Wait(500)
+        local isPlaying = IsEntityPlayingAnim(ped, dict, anim, 3)
+        print("^3[ANIM TEST]^7 IsEntityPlayingAnim: " .. tostring(isPlaying))
+    end
+
+    -- === APPROACH D: Simple melee upper body loop ===
     ClearPedTasks(ped)
-    print("^2[ANIM TEST]^7 --- Test 5: Complete ---")
-
-    -- Summary
-    print("^2[ANIM TEST]^7 ========================================")
-    print("^2[ANIM TEST]^7 SUMMARY:")
-    print("^2[ANIM TEST]^7 1. InPlace,  playIntro=false: " .. tostring(active1))
-    print("^2[ANIM TEST]^7 2. InPlace,  playIntro=true:  " .. tostring(active2))
-    print("^2[ANIM TEST]^7 3. AtPos,    playIntro=false: " .. tostring(active3))
-    print("^2[ANIM TEST]^7 4. AtPos,    playIntro=true:  " .. tostring(active4))
-    print("^2[ANIM TEST]^7 ========================================")
-
-    local workingApproaches = {}
-    if active1 then table.insert(workingApproaches, "#1: InPlace, playIntro=false") end
-    if active2 then table.insert(workingApproaches, "#2: InPlace, playIntro=true") end
-    if active3 then table.insert(workingApproaches, "#3: AtPosition, playIntro=false") end
-    if active4 then table.insert(workingApproaches, "#4: AtPosition, playIntro=true") end
-
-    if #workingApproaches > 0 then
-        print("^2[ANIM TEST]^7 ✓ Working approaches: " .. #workingApproaches)
-        for _, approach in ipairs(workingApproaches) do
-            print("^2[ANIM TEST]^7   " .. approach)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test D: Looping clipset melee_hatchet ---")
+    local dictD = "melee_hatchet"
+    local animD = "attack_high_left_slash"
+    if not HasAnimDictLoaded(dictD) then
+        RequestAnimDict(dictD)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dictD) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
         end
-    else
-        print("^1[ANIM TEST]^7 ✗ NONE worked for '" .. scenarioName .. "'")
-        print("^1[ANIM TEST]^7 All pcall results: s1=" .. tostring(s1) .. " s2=" .. tostring(s2) .. " s3=" .. tostring(s3) .. " s4=" .. tostring(s4))
-        print("^1[ANIM TEST]^7 Try: /testanim WORLD_HUMAN_GARDENER_PLANT")
     end
+    if HasAnimDictLoaded(dictD) then
+        pcall(function()
+            -- Flag 1 = loop, 49 = upper body only + hold last frame
+            TaskPlayAnim(ped, dictD, animD, 2.0, -2.0, duration, 1, 0, false, false, false)
+        end)
+        Citizen.Wait(500)
+        local isPlaying = IsEntityPlayingAnim(ped, dictD, animD, 3)
+        print("^3[ANIM TEST]^7 Looping - IsEntityPlayingAnim: " .. tostring(isPlaying))
+    end
+
+    -- === APPROACH E: melee_knife slash (alternate weapon anim) ===
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test E: melee_knife slash ---")
+    local dictE = "melee_knife@"
+    local animE = "slash_right"
+    if not HasAnimDictLoaded(dictE) then
+        RequestAnimDict(dictE)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dictE) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+    if HasAnimDictLoaded(dictE) then
+        pcall(function()
+            TaskPlayAnim(ped, dictE, animE, 3.0, -3.0, duration, 49, 0, false, false, false)
+        end)
+        Citizen.Wait(500)
+        local isPlaying = IsEntityPlayingAnim(ped, dictE, animE, 3)
+        print("^3[ANIM TEST]^7 IsEntityPlayingAnim: " .. tostring(isPlaying))
+    end
+
+    -- === APPROACH F: swing_blade_right (mining/chopping style) ===
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test F: swing_blade_right ---")
+    local dictF = "script_camera@passenger@base_r"
+    local animF = "swing_blade"
+    if not HasAnimDictLoaded(dictF) then
+        RequestAnimDict(dictF)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dictF) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+    if HasAnimDictLoaded(dictF) then
+        pcall(function()
+            TaskPlayAnim(ped, dictF, animF, 1.0, -1.0, duration, 1, 0, false, false, false)
+        end)
+        Citizen.Wait(500)
+        local isPlaying = IsEntityPlayingAnim(ped, dictF, animF, 3)
+        print("^3[ANIM TEST]^7 IsEntityPlayingAnim: " .. tostring(isPlaying))
+    end
+
+    -- === APPROACH G: ambient_m@world_human_tree_chop (non-scenario path) ===
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test G: ambient_m@world_human_chop ---")
+    local dictG = "ambient_m@world_human_chop_bronze@tree_chop_3@male_c@base"
+    local animG = "chop"
+    if not HasAnimDictLoaded(dictG) then
+        RequestAnimDict(dictG)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dictG) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+    end
+    if HasAnimDictLoaded(dictG) then
+        pcall(function()
+            TaskPlayAnim(ped, dictG, animG, 1.0, -1.0, duration, 1, 0, false, false, false)
+        end)
+        Citizen.Wait(500)
+        local isPlaying = IsEntityPlayingAnim(ped, dictG, animG, 3)
+        print("^3[ANIM TEST]^7 IsEntityPlayingAnim: " .. tostring(isPlaying))
+    end
+
+    -- Cleanup after all tests
+    ClearPedTasks(ped)
+    RemoveAnimDict(dict)
+    RemoveAnimDict(dictD)
+    RemoveAnimDict(dictE)
+    RemoveAnimDict(dictF)
+    RemoveAnimDict(dictG)
+
+    print("^2[ANIM TEST]^7 ========================================")
+    print("^2[ANIM TEST]^7 All tests complete. Check results above.")
+    print("^2[ANIM TEST]^7 ========================================")
 end)
 
 -- [[ EVENTS ]]
