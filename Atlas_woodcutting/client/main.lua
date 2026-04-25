@@ -314,6 +314,29 @@ local AnimationTests = {
     { alias = "shop_enter_gruff_rt", dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "enter_gruff_rt" },
     { alias = "shop_pos_react_b",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "pos_react_b" },
 
+    -- amb_work@world_human_tree_chop@male_a@idle_b  (TREE CHOP IDLES - D/E/F variants)
+    { alias = "idle_d",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d" },
+    { alias = "idle_e",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e" },
+    { alias = "idle_f",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f" },
+    { alias = "idle_d_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d_axe" },
+    { alias = "idle_e_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e_axe" },
+    { alias = "idle_f_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f_axe" },
+    { alias = "idle_d_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d_tree" },
+    { alias = "idle_e_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e_tree" },
+    { alias = "idle_f_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f_tree" },
+
+    -- amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b  (PRE-SWING)
+    { alias = "preswing_d",       dict = "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b", anim = "idle_d" },
+    { alias = "preswing_d_axe",   dict = "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b", anim = "idle_d_axe" },
+
+    -- amb_work@world_human_tree_chop@working@male_a@idle_b  (WORKING CHOP)
+    { alias = "work_idle_d",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_d" },
+    { alias = "work_idle_e",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_e" },
+    { alias = "work_idle_f",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_f" },
+    { alias = "work_d_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_d_axe" },
+    { alias = "work_e_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_e_axe" },
+    { alias = "work_f_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_f_axe" },
+
     -- ai_react@male_stand@small_variations@b  (REACTIONS)
     { alias = "react_f",          dict = "ai_react@male_stand@small_variations@b",       anim = "react_small_variations_f" },
     { alias = "react_d",          dict = "ai_react@male_stand@small_variations@b",       anim = "react_small_variations_d" },
@@ -334,34 +357,22 @@ RegisterCommand('testanimation', function(source, args, rawCommand)
     if not alias then
         print("^2[TESTANIM]^7 ========================================")
         print("^2[TESTANIM]^7 Usage: /testanimation <alias> [duration_ms]")
-        print("^2[TESTANIM]^7 Available aliases:")
         print("^2[TESTANIM]^7 ========================================")
-        print("^3[TESTANIM]^7 --- TREE CHOP IDLES ---")
+        print("^3[TESTANIM]^7 --- TREE CHOP IDLES (idle_a) ---")
         print("^7  tree_idle_a, tree_idle_b, tree_idle_c")
         print("^7  axe_idle_a, axe_idle_b, axe_idle_c")
         print("^7  tree_a, tree_b, tree_c")
-        print("^3[TESTANIM]^7 --- PELT HANDLING ---")
-        print("^7  pelt_enter_lf, pelt_enter_rf, pelt_base")
-        print("^7  pelt_base_horse, pelt_base_cam, pelt_lf_pelt")
-        print("^3[TESTANIM]^7 --- ROBBERY ENTERS ---")
-        print("^7  rob_enter_bottle_lf, rob_enter_outlaw_lf, rob_enter_chair_rf")
-        print("^7  rob_enter_chair_lf, rob_enter_outlaw_rf, rob_enter_player_rf")
-        print("^7  rob_enter_player_lf, rob_enter_bottle_rf")
-        print("^3[TESTANIM]^7 --- SHOPKEEPER ---")
-        print("^7  shop_pos_react_a, shop_pos_react_b, shop_neg_react_a, shop_neg_react_b")
-        print("^7  shop_neutral_a, shop_neutral_b, shop_impatient_a, shop_impatient_b")
-        print("^7  shop_idle_a, shop_idle_b, shop_idle_c")
-        print("^7  shop_long_idle_a, shop_long_idle_b")
-        print("^7  shop_enter_gruff_lt, shop_enter_gruff_rt")
-        print("^7  shop_enter_friend_rt, shop_enter_friend_lt")
-        print("^3[TESTANIM]^7 --- REACTIONS ---")
-        print("^7  react_f, react_d, react_e")
-        print("^3[TESTANIM]^7 --- MISC ---")
-        print("^7  cam_player3")
-        print("^2[TESTANIM]^7 ========================================")
-        print("^2[TESTANIM]^7 Default duration: 8 seconds (looping)")
-        print("^2[TESTANIM]^7 Example: /testanimation axe_idle_a")
-        print("^2[TESTANIM]^7 Example: /testanimation tree_a 5000")
+        print("^3[TESTANIM]^7 --- TREE CHOP IDLES (idle_b - D/E/F) ---")
+        print("^7  idle_d, idle_e, idle_f")
+        print("^7  idle_d_axe, idle_e_axe, idle_f_axe")
+        print("^7  idle_d_tree, idle_e_tree, idle_f_tree")
+        print("^3[TESTANIM]^7 --- PRE-SWING ---")
+        print("^7  preswing_d, preswing_d_axe")
+        print("^3[TESTANIM]^7 --- WORKING CHOP ---")
+        print("^7  work_idle_d, work_idle_e, work_idle_f")
+        print("^7  work_d_axe, work_e_axe, work_f_axe")
+        print("^3[TESTANIM]^7 --- PELT / ROBBERY / SHOPKEEPER / REACT ---")
+        print("^7  pelt_*, rob_*, shop_*, react_*")
         print("^2[TESTANIM]^7 ========================================")
         return
     end
@@ -422,7 +433,6 @@ RegisterCommand('testanimation', function(source, args, rawCommand)
     print("^3[TESTANIM]^7       IsEntityPlayingAnim: " .. tostring(isPlaying))
     if isPlaying then
         print("^2[TESTANIM]^7       ✓ Animation is playing on ped!")
-        VORPcore.NotifyRightTip(source, "~g~Playing: " .. alias, 3000)
     else
         print("^1[TESTANIM]^7       ⚠ Animation reported as NOT playing")
         print("^1[TESTANIM]^7       (may be playing but not detected, wait and see)")
