@@ -594,45 +594,72 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local duration = AtlasWoodConfig.ChopAnimationTime
     local interrupted = false
 
-    -- Start basic chopping animation (REVERT TO ORIGINAL WORKING VERSION)
-    print("^2[CHOP FLOW]^7 Starting chopping animation...")
-    TaskStartScenarioInPlace(playerPed, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
+    -- Store ped handle locally for the progress thread
+    local playerPedLocal = playerPed
+    local startCoordsLocal = startCoords
 
-    -- Progress thread (REVERT TO ORIGINAL WORKING VERSION)
+    -- Start chopping scenario with EXPLICIT duration (not -1) and playIntro=false
+    -- This prevents the scenario from being immediately interrupted
+    print("^2[CHOP FLOW]^7 Starting chopping scenario with duration=" .. duration .. "ms, playIntro=false...")
+    ClearPedTasks(playerPedLocal)
+    Citizen.Wait(50)
+    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration, false)
+    
+    -- Verify the scenario actually started
+    Citizen.Wait(200)
+    local scenarioActive = false
+    local scenarioCheck = pcall(function() return IsPedActiveInScenario(playerPedLocal) end)
+    if scenarioCheck then
+        scenarioActive = true
+        print("^2[CHOP FLOW]^7 ✓ Scenario confirmed active via IsPedActiveInScenario")
+    else
+        print("^1[CHOP FLOW]^7 ⚠ IsPedActiveInScenario returned false, but continuing anyway...")
+    end
+
+    -- Progress thread
     Citizen.CreateThread(function()
         print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
 
+        local lastScenarioCheck = GetGameTimer()
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
-            choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
+            local elapsed = currentTime - startTime
+            choppingProgress = math.min(elapsed / duration, 1.0)
 
             -- Debug: Print progress every second
-            local elapsedTime = currentTime - startTime
-            if elapsedTime % 1000 < 100 then -- Every ~1 second
+            if elapsed % 1000 < 100 then
                 print("^3[PROGRESS DEBUG]^7 " ..
-                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
-                print("^3[PROGRESS DEBUG]^7 isChopping: " ..
-                tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
+                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsed) .. "ms / " .. duration .. "ms)")
             end
 
-            -- Check for movement interruption (simple distance check)
-            local currentCoords = GetEntityCoords(playerPed)
-            local distance = #(startCoords - currentCoords)
+            -- Re-apply scenario every 2 seconds if it dropped (RedM scenario fragility workaround)
+            if currentTime - lastScenarioCheck > 2000 then
+                local stillActive = pcall(function() return IsPedActiveInScenario(playerPedLocal) end)
+                if not stillActive and not interrupted then
+                    print("^3[CHOP FLOW]^7 Scenario dropped, re-applying...")
+                    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration - elapsed, false)
+                end
+                lastScenarioCheck = currentTime
+            end
+
+            -- Check for movement interruption
+            local currentCoords = GetEntityCoords(playerPedLocal)
+            local distance = #(startCoordsLocal - currentCoords)
 
             if distance > 2.0 then
-                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
+                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far (" .. string.format("%.1f", distance) .. "m)")
                 interrupted = true
                 break
             end
 
-            Citizen.Wait(100) -- Check every 100ms
+            Citizen.Wait(100)
         end
 
         -- Cleanup
         isChopping = false
         choppingProgress = 0.0
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
-        ClearPedTasks(playerPed)
+        ClearPedTasks(playerPedLocal)
 
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
