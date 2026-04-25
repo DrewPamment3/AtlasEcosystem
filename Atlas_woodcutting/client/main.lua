@@ -257,44 +257,60 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
 end)
 
 -- [[ ANIMATION DISCOVERY COMMAND ]]
--- Tests LOTS of potential RDR2 animation dicts & scenarios to find working ones
 RegisterCommand('findanims', function(source, args, rawCommand)
     local ped = PlayerPedId()
     print("^2[ANIM FIND]^7 ========================================")
-    print("^2[ANIM FIND]^7 Searching for working animations...")
+    print("^2[ANIM FIND]^7 DEEP scan for visible animations...")
     print("^2[ANIM FIND]^7 ========================================")
 
-    -- === PART 1: Test animation dictionaries (TaskPlayAnim) ===
-    local animDictsToTest = {
-        -- RDR2 melee dicts
-        {"melee@hatchet@streamed_core", "attack_high_left"},
-        {"melee@hatchet@streamed", "attack_high_left"},
-        {"melee@knife@streamed_core", "attack_high_left"},
-        {"melee@unarmed@streamed_core", "heavyattack_forward_b"},
-        {"melee_hatchet", "attack_high_left_slash"},
-        {"melee_knife@", "slash_right"},
-        -- GTA V style
-        {"melee@hatchet@streamed_core", "attack_high_left_slash"},
-        {"melee@large_wpn@streamed_core", "attack_high_left_slash"},
-        -- RDR2 ambient/tool
-        {"amb_custom@world_human_tree_chop@male_a@base", "chop_loop"},
-        {"amb_custom@world_human_tree_chop@male_a@base", "chop"},
-        {"amb_custom@world_human_tree_chop@male_a", "chop"},
-        {"amb_work@world_human_tree_chop@male_a@base", "chop_loop"},
-        {"amb_work@world_human_tree_chop@male_a@idle_a", "chop_loop"},
+    -- === PART 1: Try vorp_animations config if available ===
+    local vorpState = GetResourceState('vorp_animations')
+    print("^3[ANIM FIND]^7 vorp_animations state: " .. tostring(vorpState))
+    if vorpState == 'started' then
+        print("^2[ANIM FIND]^7 vorp_animations is running! Checking for chop/axe/swing animations...")
+        -- vorp_animations exports its Config.Animations table
+        local success, animConfig = pcall(function()
+            return exports.vorp_animations.getAnimations and exports.vorp_animations:getAnimations()
+        end)
+        if success and animConfig then
+            for name, data in pairs(animConfig) do
+                if name:lower():find("chop") or name:lower():find("axe") or name:lower():find("swing") 
+                   or name:lower():find("hammer") or name:lower():find("pick") or name:lower():find("wood") then
+                    print("^2[ANIM FIND]^7 ✓ vorp_anim has: " .. name .. " -> dict=" .. tostring(data.dict) .. " anim=" .. tostring(data.name) .. " type=" .. tostring(data.type))
+                end
+            end
+        else
+            print("^3[ANIM FIND]^7 Could not access vorp_animations config: " .. tostring(animConfig))
+        end
+    end
+
+    -- === PART 2: Test broader animation dicts with flag=1 (full body loop) ===
+    print("^2[ANIM FIND]^7 --- Testing broader RDR2 dicts (full body loop, flag=1) ---")
+    local broaderTests = {
+        -- Actual work animations 
         {"amb_work@world_human_hammer@male_a@base", "hammer_loop"},
-        -- script_mechanics
+        {"amb_work@world_human_hammer@male_a", "hammer_loop"},
+        {"amb_work@world_human_shovel@male_a@base", "shovel_loop"},
+        {"amb_work@world_human_shovel@male_a", "shovel_loop"},
+        {"amb_work@world_human_pickaxe@male_a@base", "pickaxe_loop"},
+        {"amb_work@world_human_pickaxe@male_a", "pickaxe_loop"},
+        -- Hatchet melee (RDR2 native)
+        {"melee@hatchet@streamed_core", "attack_high_left"},
+        {"melee@hatchet@streamed_core", "heavy_attack"},
+        {"melee@hatchet@streamed_core", "action_hack"},
+        -- Knife melee (RDR2 native)
+        {"melee@knife@streamed_core", "attack_high"},
+        {"melee@knife@streamed_core", "slash_right"},
+        -- Unarmed heavy attack (looks like swinging)
+        {"melee@unarmed@streamed_core", "heavyattack_forward_b"},
+        {"melee@unarmed@streamed_core", "uppercut_r"},
+        -- Axe mechanics
         {"script_mechanics@axe@", "chop"},
         {"script_mechanics@axe", "chop"},
-        -- Generic RDR2 dicts  
-        {"script_common@jail_break@", "chop_wood"},
     }
-
-    local foundDicts = {}
-    for _, entry in ipairs(animDictsToTest) do
-        local dict = entry[1]
-        local anim = entry[2]
-        
+    
+    for _, entry in ipairs(broaderTests) do
+        local dict, anim = entry[1], entry[2]
         if not HasAnimDictLoaded(dict) then
             RequestAnimDict(dict)
             local timeout = GetGameTimer() + 2000
@@ -302,137 +318,91 @@ RegisterCommand('findanims', function(source, args, rawCommand)
                 Citizen.Wait(5)
             end
         end
-        
-        if HasAnimDictLoaded(dict) and not foundDicts[dict] then
-            foundDicts[dict] = true
-            print("^2[ANIM FIND]^7 ✓ Dict EXISTS: " .. dict)
-            
-            -- Now test if the specific animation exists within it
+        if HasAnimDictLoaded(dict) then
             ClearPedTasks(ped)
-            Citizen.Wait(50)
-            pcall(function()
-                TaskPlayAnim(ped, dict, anim, 2.0, -2.0, 3000, 49, 0, false, false, false)
-            end)
+            Citizen.Wait(30)
+            -- Use flag 1 (loop, full body) for maximum visibility
+            TaskPlayAnim(ped, dict, anim, 1.0, -1.0, 4000, 1, 0, false, false, false)
             Citizen.Wait(300)
             local playing = IsEntityPlayingAnim(ped, dict, anim, 3)
             if playing then
-                print("^2[ANIM FIND]^7   ✓ Anim WORKS: " .. anim .. " (visible!)")
-            else
-                print("^3[ANIM FIND]^7   ~ Anim '" .. anim .. "' not found in dict (dict loads but anim name may differ)")
+                print("^2[ANIM FIND]^7 ✓✓ PLAYING: " .. dict .. " / " .. anim .. " (visible!!)")
             end
             ClearPedTasks(ped)
-        end
-        
-        RemoveAnimDict(dict)
-        Citizen.Wait(50)
-    end
-
-    -- === PART 2: Test scenarios (TaskStartScenarioInPlace) ===
-    print("^2[ANIM FIND]^7 --- Testing scenarios ---")
-    local scenariosToTest = {
-        "WORLD_HUMAN_TREE_CHOP",
-        "WORLD_HUMAN_CHOP_WOOD",
-        "PROP_HUMAN_TREE_CHOP",
-        "WORLD_HUMAN_HAMMER",
-        "WORLD_HUMAN_GARDENER_PLANT",
-        "WORLD_HUMAN_CROUCH_INSPECT",
-        "WORLD_HUMAN_STAND_IMPATIENT",
-        "WORLD_HUMAN_DRINKING",
-        "WORLD_HUMAN_SMOKING",
-        "WORLD_HUMAN_GUARD_STAND",
-        "PROP_HUMAN_SEAT_CHAIR",
-        "WORLD_HUMAN_LEANING",
-        "WORLD_HUMAN_BROOM",
-        "WORLD_HUMAN_SHOVEL",
-        "WORLD_HUMAN_PICKAXE",
-        "WORLD_HUMAN_AXE",
-    }
-
-    for _, scenario in ipairs(scenariosToTest) do
-        ClearPedTasks(ped)
-        Citizen.Wait(50)
-        pcall(function()
-            TaskStartScenarioInPlace(ped, GetHashKey(scenario), 2000, true, false, false, false)
-        end)
-        Citizen.Wait(300)
-        local active = pcall(function() return IsPedActiveInScenario(ped) end)
-        local still = IsPedStill(ped)
-        if active then
-            print("^2[ANIM FIND]^7 ✓ Scenario ACTIVE: " .. scenario .. " | IsPedStill=" .. tostring(still))
-        end
-        ClearPedTasks(ped)
-        Citizen.Wait(50)
-    end
-
-    -- === PART 3: Brute-force anim names in the 2 confirmed dicts ===
-    print("^2[ANIM FIND]^7 --- Brute-forcing anim names in confirmed dicts ---")
-    local dictsWithNames = {
-        {"amb_work@world_human_tree_chop@male_a@base", 
-            {"base", "idle", "idle_a", "idle_b", "idle_c", "work", "action", "chop", "chop_loop", "chop_a", "chop_b", 
-             "chop_idle", "chop_tree", "tree_chop", "loop", "male", "chop_wood", "chop_axe", "swing_axe", "hit_tree",
-             "worker_a", "base_chop", "base_loop", "idle_loop", "work_loop", "action_a", "action_b"}},
-        {"amb_work@world_human_tree_chop@male_a@idle_a",
-            {"idle_a", "idle", "idle_b", "base", "chop", "work", "loop", "action", "idle_loop", "chop_idle", "idle_chop"}},
-    }
-    
-    for _, dictData in ipairs(dictsWithNames) do
-        local dict = dictData[1]
-        local names = dictData[2]
-        
-        if not HasAnimDictLoaded(dict) then
-            RequestAnimDict(dict)
-            local timeout = GetGameTimer() + 2000
-            while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
-                Citizen.Wait(5)
-            end
-        end
-        
-        if HasAnimDictLoaded(dict) then
-            print("^2[ANIM FIND]^7 Testing names in: " .. dict)
-            for _, name in ipairs(names) do
-                ClearPedTasks(ped)
-                Citizen.Wait(30)
-                -- Try with different flags: 1=loop, 49=upperbody+hold
-                local success = pcall(function()
-                    TaskPlayAnim(ped, dict, name, 1.0, -1.0, 3000, 1, 0, false, false, false)
-                end)
-                Citizen.Wait(200)
-                local playing = IsEntityPlayingAnim(ped, dict, name, 3)
-                if playing then
-                    print("^2[ANIM FIND]^7   ✓✓ WORKS: '" .. name .. "' — THIS ONE PLAYS!")
-                end
-                ClearPedTasks(ped)
-            end
+            RemoveAnimDict(dict)
+            Citizen.Wait(50)
         end
     end
     
-    -- Also try DoesAnimDictExist on a broader set
-    print("^2[ANIM FIND]^7 --- Broad DoesAnimDictExist check ---")
-    local broadDicts = {
-        "amb_work@world_human_tree_chop@male_a@base",
-        "amb_work@world_human_tree_chop@male_a@idle_a",
-        "amb_work@world_human_tree_chop@male_a",
-        "amb_work@world_human_axe@male_a@base",
-        "amb_work@world_human_axe@male_a",
-        "amb_work@world_human_pickaxe@male_a@base",
-        "amb_work@world_human_hammer@male_a@base",
-        "amb_work@world_human_hammer@male_a",
-        "amb_work@world_human_shovel@male_a@base",
-        "melee@hatchet@streamed_core",
-        "melee@knife@streamed_core",
-        "melee@unarmed@streamed_core",
-        "script_mechanics@axe@",
-    }
-    for _, d in ipairs(broadDicts) do
-        local exists = DoesAnimDictExist(d)
-        if exists then
-            print("^2[ANIM FIND]^7 ✓ Dict: " .. d)
+    -- === PART 3: Test GARDENER_PLANT as visible scenario (known to work in RDR2) ===
+    print("^2[ANIM FIND]^7 --- Testing WORLD_HUMAN_GARDENER_PLANT (full scenario test) ---")
+    ClearPedTasks(ped)
+    Citizen.Wait(100)
+    TaskStartScenarioInPlace(ped, GetHashKey("WORLD_HUMAN_GARDENER_PLANT"), 5000, true, false, false, false)
+    Citizen.Wait(500)
+    local active = pcall(function() return IsPedActiveInScenario(ped) end)
+    local still = IsPedStill(ped)
+    print("^3[ANIM FIND]^7 GARDENER_PLANT - Active: " .. tostring(active) .. " | Still: " .. tostring(still))
+    Citizen.Wait(4000)
+    ClearPedTasks(ped)
+    print("^2[ANIM FIND]^7 (Did you see a digging/planting animation?)")
+
+    -- === PART 4: Manual test command reference ===
+    print("^2[ANIM FIND]^7 ========================================")
+    print("^2[ANIM FIND]^7 Use /playanim <dict> <anim> to test manually")
+    print("^2[ANIM FIND]^7 Example: /playanim melee@unarmed@streamed_core uppercut_r")
+    print("^2[ANIM FIND]^7 ========================================")
+end)
+
+-- Quick manual animation test command
+RegisterCommand('playanim', function(source, args, rawCommand)
+    local dict = args[1]
+    local anim = args[2]
+    local duration = tonumber(args[3]) or 5000
+    
+    if not dict or not anim then
+        print("^1[PLAYANIM]^7 Usage: /playanim <dict> <anim> [duration_ms]")
+        return
+    end
+    
+    local ped = PlayerPedId()
+    print("^2[PLAYANIM]^7 Testing: " .. dict .. " / " .. anim .. " for " .. duration .. "ms")
+    
+    if not HasAnimDictLoaded(dict) then
+        RequestAnimDict(dict)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+            Citizen.Wait(5)
         end
     end
-
-    print("^2[ANIM FIND]^7 ========================================")
-    print("^2[ANIM FIND]^7 Search complete. Look for ✓✓ above.")
-    print("^2[ANIM FIND]^7 ========================================")
+    
+    if not HasAnimDictLoaded(dict) then
+        print("^1[PLAYANIM]^7 Failed to load dict: " .. dict)
+        return
+    end
+    
+    ClearPedTasks(ped)
+    Citizen.Wait(50)
+    
+    -- Try with flag 1 (loop)
+    TaskPlayAnim(ped, dict, anim, 1.0, -1.0, duration, 1, 0, false, false, false)
+    Citizen.Wait(200)
+    local playing = IsEntityPlayingAnim(ped, dict, anim, 3)
+    print("^2[PLAYANIM]^7 Playing (loop): " .. tostring(playing))
+    
+    -- If not playing, try flag 49 (upper body)
+    if not playing then
+        ClearPedTasks(ped)
+        Citizen.Wait(50)
+        TaskPlayAnim(ped, dict, anim, 4.0, -4.0, duration, 49, 0, false, false, false)
+        Citizen.Wait(200)
+        playing = IsEntityPlayingAnim(ped, dict, anim, 3)
+        print("^2[PLAYANIM]^7 Playing (upperbody): " .. tostring(playing))
+    end
+    
+    Citizen.Wait(duration)
+    ClearPedTasks(ped)
+    print("^2[PLAYANIM]^7 Done.")
 end)
 
 -- [[ EVENTS ]]
