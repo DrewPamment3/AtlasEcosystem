@@ -271,56 +271,100 @@ RegisterCommand('testanim', function(source, args, rawCommand)
     local scenarioHash = GetHashKey(scenarioName)
     local pCoords = GetEntityCoords(ped)
 
+    -- Helper: safe scenario check (tries multiple native names)
+    local function IsScenarioActive(ped, hash)
+        -- Try IsPedActiveInScenario (RedM)
+        local success, result = pcall(function()
+            return IsPedActiveInScenario(ped)
+        end)
+        if success and type(result) == "boolean" then
+            return result
+        end
+        -- Fallback: just check if ped is still doing *something*
+        return IsPedStill(ped) == false  -- moving/animating = not still
+    end
+
+    local active1, active2, active3, active4 = false, false, false, false
+
     -- Test 1: TaskStartScenarioInPlace with playIntro=false
-    print("^3[ANIM TEST]^7 --- Test 1: TaskStartScenarioInPlace, playIntro=FALSE ---")
+    print("^3[ANIM TEST]^7 --- Test 1: InPlace, playIntro=FALSE ---")
     ClearPedTasks(ped)
     Citizen.Wait(100)
-    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+    local s1, r1 = pcall(function()
+        TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+    end)
     Citizen.Wait(500)
-    local active1 = IsPedUsingScenario(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Result: " .. tostring(active1))
+    active1 = IsScenarioActive(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s1) .. " | Scenario active: " .. tostring(active1))
 
-    -- Test 2: TaskStartScenarioInPlace with playIntro=true
+    -- Test 2: TaskStartScenarioInPlace with playIntro=true (current code)
     ClearPedTasks(ped)
     Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 2: TaskStartScenarioInPlace, playIntro=TRUE ---")
-    TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+    print("^3[ANIM TEST]^7 --- Test 2: InPlace, playIntro=TRUE ---")
+    local s2, r2 = pcall(function()
+        TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+    end)
     Citizen.Wait(500)
-    local active2 = IsPedUsingScenario(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Result: " .. tostring(active2))
+    active2 = IsScenarioActive(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s2) .. " | Scenario active: " .. tostring(active2))
 
     -- Test 3: TaskStartScenarioAtPosition with playIntro=false
     ClearPedTasks(ped)
     Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 3: TaskStartScenarioAtPosition, playIntro=FALSE ---")
-    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
+    print("^3[ANIM TEST]^7 --- Test 3: AtPosition, playIntro=FALSE ---")
+    local s3, r3 = pcall(function()
+        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
+    end)
     Citizen.Wait(500)
-    local active3 = IsPedUsingScenario(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Result: " .. tostring(active3))
+    active3 = IsScenarioActive(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s3) .. " | Scenario active: " .. tostring(active3))
 
     -- Test 4: TaskStartScenarioAtPosition with playIntro=true
     ClearPedTasks(ped)
     Citizen.Wait(300)
-    print("^3[ANIM TEST]^7 --- Test 4: TaskStartScenarioAtPosition, playIntro=TRUE ---")
-    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
+    print("^3[ANIM TEST]^7 --- Test 4: AtPosition, playIntro=TRUE ---")
+    local s4, r4 = pcall(function()
+        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
+    end)
     Citizen.Wait(500)
-    local active4 = IsPedUsingScenario(ped, scenarioHash)
-    print("^3[ANIM TEST]^7 Result: " .. tostring(active4))
+    active4 = IsScenarioActive(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Native call success: " .. tostring(s4) .. " | Scenario active: " .. tostring(active4))
 
-    -- Test 5: Play full scenario with timer (InPlace, playIntro=false)
+    -- Test 5: Play full scenario with timer using the best approach
     ClearPedTasks(ped)
     Citizen.Wait(300)
     print("^3[ANIM TEST]^7 --- Test 5: Running full " .. (duration/1000) .. "s scenario ---")
-    print("^3[ANIM TEST]^7 Using: TaskStartScenarioInPlace, playIntro=FALSE (most likely to work)")
-    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
-    local startTime = GetGameTimer()
-    while GetGameTimer() - startTime < duration do
-        local stillActive = IsPedUsingScenario(ped, scenarioHash)
-        if GetGameTimer() - startTime > 1000 and not stillActive then
-            print("^1[ANIM TEST]^7 Scenario STOPPED after ~" .. math.floor((GetGameTimer() - startTime)/1000) .. "s!")
-            break
+    local didStart = false
+    if active1 then
+        print("^3[ANIM TEST]^7 Using #1: InPlace, playIntro=false")
+        TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+        didStart = true
+    elseif active2 then
+        print("^3[ANIM TEST]^7 Using #2: InPlace, playIntro=true")
+        TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+        didStart = true
+    elseif active3 then
+        print("^3[ANIM TEST]^7 Using #3: AtPosition, playIntro=false")
+        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
+        didStart = true
+    elseif active4 then
+        print("^3[ANIM TEST]^7 Using #4: AtPosition, playIntro=true")
+        TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
+        didStart = true
+    end
+
+    if didStart then
+        local startTime = GetGameTimer()
+        while GetGameTimer() - startTime < duration do
+            local stillActive = IsScenarioActive(ped, scenarioHash)
+            if GetGameTimer() - startTime > 1000 and not stillActive then
+                print("^1[ANIM TEST]^7 Scenario STOPPED after ~" .. math.floor((GetGameTimer() - startTime)/1000) .. "s!")
+                break
+            end
+            Citizen.Wait(200)
         end
-        Citizen.Wait(200)
+    else
+        print("^1[ANIM TEST]^7 No approach worked in Tests 1-4, skipping full run")
     end
     ClearPedTasks(ped)
     print("^2[ANIM TEST]^7 --- Test 5: Complete ---")
@@ -346,8 +390,9 @@ RegisterCommand('testanim', function(source, args, rawCommand)
             print("^2[ANIM TEST]^7   " .. approach)
         end
     else
-        print("^1[ANIM TEST]^7 ✗ NONE of the approaches worked for '" .. scenarioName .. "'")
-        print("^1[ANIM TEST]^7 Try a different scenario name, e.g.: /testanim WORLD_HUMAN_GARDENER_PLANT")
+        print("^1[ANIM TEST]^7 ✗ NONE worked for '" .. scenarioName .. "'")
+        print("^1[ANIM TEST]^7 All pcall results: s1=" .. tostring(s1) .. " s2=" .. tostring(s2) .. " s3=" .. tostring(s3) .. " s4=" .. tostring(s4))
+        print("^1[ANIM TEST]^7 Try: /testanim WORLD_HUMAN_GARDENER_PLANT")
     end
 end)
 
