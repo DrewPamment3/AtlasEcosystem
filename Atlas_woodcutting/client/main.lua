@@ -256,153 +256,99 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
     print("^2[Atlas Debug]^7 Position: (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
 end)
 
--- [[ ANIMATION DISCOVERY COMMAND ]]
-RegisterCommand('findanims', function(source, args, rawCommand)
+-- [[ ANIMATION TEST COMMAND ]]
+-- Tests various animation approaches to find what works on this RedM build
+RegisterCommand('testanim', function(source, args, rawCommand)
+    local scenarioName = args[1] or "WORLD_HUMAN_TREE_CHOP"
+    local duration = tonumber(args[2]) or 5000
+
     local ped = PlayerPedId()
-    print("^2[ANIM FIND]^7 ========================================")
-    print("^2[ANIM FIND]^7 DEEP scan for visible animations...")
-    print("^2[ANIM FIND]^7 ========================================")
+    print("^2[ANIM TEST]^7 ========================================")
+    print("^2[ANIM TEST]^7 Testing animation approaches for: " .. scenarioName)
+    print("^2[ANIM TEST]^7 Duration: " .. duration .. "ms")
+    print("^2[ANIM TEST]^7 ========================================")
 
-    -- === PART 1: Try vorp_animations config if available ===
-    local vorpState = GetResourceState('vorp_animations')
-    print("^3[ANIM FIND]^7 vorp_animations state: " .. tostring(vorpState))
-    if vorpState == 'started' then
-        print("^2[ANIM FIND]^7 vorp_animations is running! Checking for chop/axe/swing animations...")
-        -- vorp_animations exports its Config.Animations table
-        local success, animConfig = pcall(function()
-            return exports.vorp_animations.getAnimations and exports.vorp_animations:getAnimations()
-        end)
-        if success and animConfig then
-            for name, data in pairs(animConfig) do
-                if name:lower():find("chop") or name:lower():find("axe") or name:lower():find("swing") 
-                   or name:lower():find("hammer") or name:lower():find("pick") or name:lower():find("wood") then
-                    print("^2[ANIM FIND]^7 ✓ vorp_anim has: " .. name .. " -> dict=" .. tostring(data.dict) .. " anim=" .. tostring(data.name) .. " type=" .. tostring(data.type))
-                end
-            end
-        else
-            print("^3[ANIM FIND]^7 Could not access vorp_animations config: " .. tostring(animConfig))
-        end
-    end
+    local scenarioHash = GetHashKey(scenarioName)
+    local pCoords = GetEntityCoords(ped)
 
-    -- === PART 2: Test broader animation dicts with flag=1 (full body loop) ===
-    print("^2[ANIM FIND]^7 --- Testing broader RDR2 dicts (full body loop, flag=1) ---")
-    local broaderTests = {
-        -- Actual work animations 
-        {"amb_work@world_human_hammer@male_a@base", "hammer_loop"},
-        {"amb_work@world_human_hammer@male_a", "hammer_loop"},
-        {"amb_work@world_human_shovel@male_a@base", "shovel_loop"},
-        {"amb_work@world_human_shovel@male_a", "shovel_loop"},
-        {"amb_work@world_human_pickaxe@male_a@base", "pickaxe_loop"},
-        {"amb_work@world_human_pickaxe@male_a", "pickaxe_loop"},
-        -- Hatchet melee (RDR2 native)
-        {"melee@hatchet@streamed_core", "attack_high_left"},
-        {"melee@hatchet@streamed_core", "heavy_attack"},
-        {"melee@hatchet@streamed_core", "action_hack"},
-        -- Knife melee (RDR2 native)
-        {"melee@knife@streamed_core", "attack_high"},
-        {"melee@knife@streamed_core", "slash_right"},
-        -- Unarmed heavy attack (looks like swinging)
-        {"melee@unarmed@streamed_core", "heavyattack_forward_b"},
-        {"melee@unarmed@streamed_core", "uppercut_r"},
-        -- Axe mechanics
-        {"script_mechanics@axe@", "chop"},
-        {"script_mechanics@axe", "chop"},
-    }
-    
-    for _, entry in ipairs(broaderTests) do
-        local dict, anim = entry[1], entry[2]
-        if not HasAnimDictLoaded(dict) then
-            RequestAnimDict(dict)
-            local timeout = GetGameTimer() + 2000
-            while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
-                Citizen.Wait(5)
-            end
-        end
-        if HasAnimDictLoaded(dict) then
-            ClearPedTasks(ped)
-            Citizen.Wait(30)
-            -- Use flag 1 (loop, full body) for maximum visibility
-            TaskPlayAnim(ped, dict, anim, 1.0, -1.0, 4000, 1, 0, false, false, false)
-            Citizen.Wait(300)
-            local playing = IsEntityPlayingAnim(ped, dict, anim, 3)
-            if playing then
-                print("^2[ANIM FIND]^7 ✓✓ PLAYING: " .. dict .. " / " .. anim .. " (visible!!)")
-            end
-            ClearPedTasks(ped)
-            RemoveAnimDict(dict)
-            Citizen.Wait(50)
-        end
-    end
-    
-    -- === PART 3: Test GARDENER_PLANT as visible scenario (known to work in RDR2) ===
-    print("^2[ANIM FIND]^7 --- Testing WORLD_HUMAN_GARDENER_PLANT (full scenario test) ---")
+    -- Test 1: TaskStartScenarioInPlace with playIntro=false
+    print("^3[ANIM TEST]^7 --- Test 1: TaskStartScenarioInPlace, playIntro=FALSE ---")
     ClearPedTasks(ped)
     Citizen.Wait(100)
-    TaskStartScenarioInPlace(ped, GetHashKey("WORLD_HUMAN_GARDENER_PLANT"), 5000, true, false, false, false)
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
     Citizen.Wait(500)
-    local active = pcall(function() return IsPedActiveInScenario(ped) end)
-    local still = IsPedStill(ped)
-    print("^3[ANIM FIND]^7 GARDENER_PLANT - Active: " .. tostring(active) .. " | Still: " .. tostring(still))
-    Citizen.Wait(4000)
+    local active1 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active1))
+
+    -- Test 2: TaskStartScenarioInPlace with playIntro=true
     ClearPedTasks(ped)
-    print("^2[ANIM FIND]^7 (Did you see a digging/planting animation?)")
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 2: TaskStartScenarioInPlace, playIntro=TRUE ---")
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, true)
+    Citizen.Wait(500)
+    local active2 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active2))
 
-    -- === PART 4: Manual test command reference ===
-    print("^2[ANIM FIND]^7 ========================================")
-    print("^2[ANIM FIND]^7 Use /playanim <dict> <anim> to test manually")
-    print("^2[ANIM FIND]^7 Example: /playanim melee@unarmed@streamed_core uppercut_r")
-    print("^2[ANIM FIND]^7 ========================================")
-end)
+    -- Test 3: TaskStartScenarioAtPosition with playIntro=false
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 3: TaskStartScenarioAtPosition, playIntro=FALSE ---")
+    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, false)
+    Citizen.Wait(500)
+    local active3 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active3))
 
--- Quick manual animation test command
-RegisterCommand('playanim', function(source, args, rawCommand)
-    local dict = args[1]
-    local anim = args[2]
-    local duration = tonumber(args[3]) or 5000
-    
-    if not dict or not anim then
-        print("^1[PLAYANIM]^7 Usage: /playanim <dict> <anim> [duration_ms]")
-        return
-    end
-    
-    local ped = PlayerPedId()
-    print("^2[PLAYANIM]^7 Testing: " .. dict .. " / " .. anim .. " for " .. duration .. "ms")
-    
-    if not HasAnimDictLoaded(dict) then
-        RequestAnimDict(dict)
-        local timeout = GetGameTimer() + 3000
-        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
-            Citizen.Wait(5)
+    -- Test 4: TaskStartScenarioAtPosition with playIntro=true
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 4: TaskStartScenarioAtPosition, playIntro=TRUE ---")
+    TaskStartScenarioAtPosition(ped, scenarioHash, pCoords.x, pCoords.y, pCoords.z - 0.5, GetEntityHeading(ped), -1, false, true)
+    Citizen.Wait(500)
+    local active4 = IsPedUsingScenario(ped, scenarioHash)
+    print("^3[ANIM TEST]^7 Result: " .. tostring(active4))
+
+    -- Test 5: Play full scenario with timer (InPlace, playIntro=false)
+    ClearPedTasks(ped)
+    Citizen.Wait(300)
+    print("^3[ANIM TEST]^7 --- Test 5: Running full " .. (duration/1000) .. "s scenario ---")
+    print("^3[ANIM TEST]^7 Using: TaskStartScenarioInPlace, playIntro=FALSE (most likely to work)")
+    TaskStartScenarioInPlace(ped, scenarioHash, -1, false)
+    local startTime = GetGameTimer()
+    while GetGameTimer() - startTime < duration do
+        local stillActive = IsPedUsingScenario(ped, scenarioHash)
+        if GetGameTimer() - startTime > 1000 and not stillActive then
+            print("^1[ANIM TEST]^7 Scenario STOPPED after ~" .. math.floor((GetGameTimer() - startTime)/1000) .. "s!")
+            break
         end
-    end
-    
-    if not HasAnimDictLoaded(dict) then
-        print("^1[PLAYANIM]^7 Failed to load dict: " .. dict)
-        return
-    end
-    
-    ClearPedTasks(ped)
-    Citizen.Wait(50)
-    
-    -- Try with flag 1 (loop)
-    TaskPlayAnim(ped, dict, anim, 1.0, -1.0, duration, 1, 0, false, false, false)
-    Citizen.Wait(200)
-    local playing = IsEntityPlayingAnim(ped, dict, anim, 3)
-    print("^2[PLAYANIM]^7 Playing (loop): " .. tostring(playing))
-    
-    -- If not playing, try flag 49 (upper body)
-    if not playing then
-        ClearPedTasks(ped)
-        Citizen.Wait(50)
-        TaskPlayAnim(ped, dict, anim, 4.0, -4.0, duration, 49, 0, false, false, false)
         Citizen.Wait(200)
-        playing = IsEntityPlayingAnim(ped, dict, anim, 3)
-        print("^2[PLAYANIM]^7 Playing (upperbody): " .. tostring(playing))
     end
-    
-    Citizen.Wait(duration)
     ClearPedTasks(ped)
-    print("^2[PLAYANIM]^7 Done.")
+    print("^2[ANIM TEST]^7 --- Test 5: Complete ---")
+
+    -- Summary
+    print("^2[ANIM TEST]^7 ========================================")
+    print("^2[ANIM TEST]^7 SUMMARY:")
+    print("^2[ANIM TEST]^7 1. InPlace,  playIntro=false: " .. tostring(active1))
+    print("^2[ANIM TEST]^7 2. InPlace,  playIntro=true:  " .. tostring(active2))
+    print("^2[ANIM TEST]^7 3. AtPos,    playIntro=false: " .. tostring(active3))
+    print("^2[ANIM TEST]^7 4. AtPos,    playIntro=true:  " .. tostring(active4))
+    print("^2[ANIM TEST]^7 ========================================")
+
+    local workingApproaches = {}
+    if active1 then table.insert(workingApproaches, "#1: InPlace, playIntro=false") end
+    if active2 then table.insert(workingApproaches, "#2: InPlace, playIntro=true") end
+    if active3 then table.insert(workingApproaches, "#3: AtPosition, playIntro=false") end
+    if active4 then table.insert(workingApproaches, "#4: AtPosition, playIntro=true") end
+
+    if #workingApproaches > 0 then
+        print("^2[ANIM TEST]^7 ✓ Working approaches: " .. #workingApproaches)
+        for _, approach in ipairs(workingApproaches) do
+            print("^2[ANIM TEST]^7   " .. approach)
+        end
+    else
+        print("^1[ANIM TEST]^7 ✗ NONE of the approaches worked for '" .. scenarioName .. "'")
+        print("^1[ANIM TEST]^7 Try a different scenario name, e.g.: /testanim WORLD_HUMAN_GARDENER_PLANT")
+    end
 end)
 
 -- [[ EVENTS ]]
@@ -575,105 +521,45 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local duration = AtlasWoodConfig.ChopAnimationTime
     local interrupted = false
 
-    -- Store ped handle locally for the progress thread
-    local playerPedLocal = playerPed
-    local startCoordsLocal = startCoords
+    -- Start basic chopping animation (REVERT TO ORIGINAL WORKING VERSION)
+    print("^2[CHOP FLOW]^7 Starting chopping animation...")
+    TaskStartScenarioInPlace(playerPed, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
 
-    -- Use TaskPlayAnim with a known-working animation dict (standard approach, NOT scenario)
-    -- melee_hatchet or melee_knife@ are reliable across RedM builds
-    print("^2[CHOP FLOW]^7 Starting chopping animation via TaskPlayAnim...")
-    
-    local animDict = nil
-    local animName = nil
-    local primaryDict = "melee_hatchet"
-    local primaryAnim = "attack_high_left_slash"
-    local fallbackDict = "melee_knife@"
-    local fallbackAnim = "slash_right"
-    
-    -- Try primary dict first, fall back to secondary
-    if not HasAnimDictLoaded(primaryDict) then
-        RequestAnimDict(primaryDict)
-        local timeout = GetGameTimer() + 3000
-        while not HasAnimDictLoaded(primaryDict) and GetGameTimer() < timeout do
-            Citizen.Wait(10)
-        end
-    end
-    
-    if HasAnimDictLoaded(primaryDict) then
-        animDict = primaryDict
-        animName = primaryAnim
-        ClearPedTasks(playerPedLocal)
-        Citizen.Wait(50)
-        TaskPlayAnim(playerPedLocal, animDict, animName, 4.0, -4.0, duration, 49, 0, false, false, false)
-        print("^2[CHOP FLOW]^7 ✓ Animation started (" .. animDict .. "/" .. animName .. ")")
-    elseif not HasAnimDictLoaded(fallbackDict) then
-        RequestAnimDict(fallbackDict)
-        local timeout = GetGameTimer() + 3000
-        while not HasAnimDictLoaded(fallbackDict) and GetGameTimer() < timeout do
-            Citizen.Wait(10)
-        end
-    end
-    
-    if not animDict and HasAnimDictLoaded(fallbackDict) then
-        animDict = fallbackDict
-        animName = fallbackAnim
-        ClearPedTasks(playerPedLocal)
-        Citizen.Wait(50)
-        TaskPlayAnim(playerPedLocal, animDict, animName, 3.0, -3.0, duration, 49, 0, false, false, false)
-        print("^2[CHOP FLOW]^7 ✓ Animation started (fallback: " .. animDict .. "/" .. animName .. ")")
-    end
-    
-    if not animDict then
-        print("^1[CHOP FLOW]^7 ⚠ No animation dicts available, proceeding without animation")
-    end
-
-    -- Progress thread
+    -- Progress thread (REVERT TO ORIGINAL WORKING VERSION)
     Citizen.CreateThread(function()
         print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
 
-        local lastScenarioCheck = GetGameTimer()
         while GetGameTimer() - startTime < duration and not interrupted do
             local currentTime = GetGameTimer()
-            local elapsed = currentTime - startTime
-            choppingProgress = math.min(elapsed / duration, 1.0)
+            choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
 
             -- Debug: Print progress every second
-            if elapsed % 1000 < 100 then
+            local elapsedTime = currentTime - startTime
+            if elapsedTime % 1000 < 100 then -- Every ~1 second
                 print("^3[PROGRESS DEBUG]^7 " ..
-                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsed) .. "ms / " .. duration .. "ms)")
+                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
+                print("^3[PROGRESS DEBUG]^7 isChopping: " ..
+                tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
             end
 
-            -- Re-apply scenario every 2 seconds if it dropped (RedM scenario fragility workaround)
-            if currentTime - lastScenarioCheck > 2000 then
-                local stillActive = pcall(function() return IsPedActiveInScenario(playerPedLocal) end)
-                if not stillActive and not interrupted then
-                    print("^3[CHOP FLOW]^7 Scenario dropped, re-applying...")
-                    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration - elapsed, false)
-                end
-                lastScenarioCheck = currentTime
-            end
-
-            -- Check for movement interruption
-            local currentCoords = GetEntityCoords(playerPedLocal)
-            local distance = #(startCoordsLocal - currentCoords)
+            -- Check for movement interruption (simple distance check)
+            local currentCoords = GetEntityCoords(playerPed)
+            local distance = #(startCoords - currentCoords)
 
             if distance > 2.0 then
-                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far (" .. string.format("%.1f", distance) .. "m)")
+                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
                 interrupted = true
                 break
             end
 
-            Citizen.Wait(100)
+            Citizen.Wait(100) -- Check every 100ms
         end
 
         -- Cleanup
         isChopping = false
         choppingProgress = 0.0
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
-        if animDict then
-            StopAnimTask(playerPedLocal, animDict, animName, 1.0)
-        end
-        ClearPedTasks(playerPedLocal)
+        ClearPedTasks(playerPed)
 
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
