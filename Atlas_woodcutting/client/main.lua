@@ -271,11 +271,11 @@ RegisterCommand('testanim', function(source, args, rawCommand)
     local pCoords = GetEntityCoords(ped)
     local startTime = GetGameTimer()
 
-    -- === APPROACH A: TaskStartScenarioInPlace ===
-    print("^3[ANIM TEST]^7 --- Test A: TaskStartScenarioInPlace ---")
+    -- === APPROACH A: TaskStartScenarioInPlace (vorp_animations compatible 7-param) ===
+    print("^3[ANIM TEST]^7 --- Test A: TaskStartScenarioInPlace (7-param, playIntro=true) ---")
     ClearPedTasks(ped)
     Citizen.Wait(100)
-    pcall(function() TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), duration, false) end)
+    pcall(function() TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), duration, true, false, false, false) end)
     Citizen.Wait(500)
     local aActive = pcall(function() return IsPedActiveInScenario(ped) end)
     print("^3[ANIM TEST]^7 IsPedActiveInScenario: " .. tostring(aActive))
@@ -598,12 +598,12 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local playerPedLocal = playerPed
     local startCoordsLocal = startCoords
 
-    -- Start chopping scenario with EXPLICIT duration (not -1) and playIntro=false
-    -- This prevents the scenario from being immediately interrupted
-    print("^2[CHOP FLOW]^7 Starting chopping scenario with duration=" .. duration .. "ms, playIntro=false...")
+    -- Use the EXACT same TaskStartScenarioInPlace signature as vorp_animations
+    -- (7 params: ped, hash, duration, playIntro, p4, p5, p6)
+    print("^2[CHOP FLOW]^7 Starting chopping scenario (vorp_animations compatible)...")
     ClearPedTasks(playerPedLocal)
     Citizen.Wait(50)
-    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration, false)
+    TaskStartScenarioInPlace(playerPedLocal, GetHashKey("WORLD_HUMAN_TREE_CHOP"), duration, true, false, false, false)
     
     -- Verify the scenario actually started
     Citizen.Wait(200)
