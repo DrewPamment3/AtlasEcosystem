@@ -202,8 +202,6 @@ function AtlasWoodConfig.GetTreeZOffset(modelName)
     return AtlasWoodConfig.TreeModelZOffsets[modelName] or 0.2
 end
 
-
-
 -- Loot calculation functions
 function AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, isBonus)
     local loot = AtlasWoodConfig.LootSystem
