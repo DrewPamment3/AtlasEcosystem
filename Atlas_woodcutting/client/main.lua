@@ -364,27 +364,74 @@ RegisterCommand('findanims', function(source, args, rawCommand)
         Citizen.Wait(50)
     end
 
-    -- === PART 3: Try DoesAnimDictExist to list available dicts ===
-    print("^2[ANIM FIND]^7 --- Quick DoesAnimDictExist check ---")
-    local quickDicts = {
-        "melee@hatchet@streamed_core",
-        "melee@knife@streamed_core", 
-        "melee@unarmed@streamed_core",
-        "amb_custom@world_human_tree_chop@male_a@base",
-        "amb_work@world_human_tree_chop@male_a@base",
-        "script_common@jail_break@",
-        "script_mechanics@axe@",
-        "ai_react@",
+    -- === PART 3: Brute-force anim names in the 2 confirmed dicts ===
+    print("^2[ANIM FIND]^7 --- Brute-forcing anim names in confirmed dicts ---")
+    local dictsWithNames = {
+        {"amb_work@world_human_tree_chop@male_a@base", 
+            {"base", "idle", "idle_a", "idle_b", "idle_c", "work", "action", "chop", "chop_loop", "chop_a", "chop_b", 
+             "chop_idle", "chop_tree", "tree_chop", "loop", "male", "chop_wood", "chop_axe", "swing_axe", "hit_tree",
+             "worker_a", "base_chop", "base_loop", "idle_loop", "work_loop", "action_a", "action_b"}},
+        {"amb_work@world_human_tree_chop@male_a@idle_a",
+            {"idle_a", "idle", "idle_b", "base", "chop", "work", "loop", "action", "idle_loop", "chop_idle", "idle_chop"}},
     }
-    for _, d in ipairs(quickDicts) do
+    
+    for _, dictData in ipairs(dictsWithNames) do
+        local dict = dictData[1]
+        local names = dictData[2]
+        
+        if not HasAnimDictLoaded(dict) then
+            RequestAnimDict(dict)
+            local timeout = GetGameTimer() + 2000
+            while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+                Citizen.Wait(5)
+            end
+        end
+        
+        if HasAnimDictLoaded(dict) then
+            print("^2[ANIM FIND]^7 Testing names in: " .. dict)
+            for _, name in ipairs(names) do
+                ClearPedTasks(ped)
+                Citizen.Wait(30)
+                -- Try with different flags: 1=loop, 49=upperbody+hold
+                local success = pcall(function()
+                    TaskPlayAnim(ped, dict, name, 1.0, -1.0, 3000, 1, 0, false, false, false)
+                end)
+                Citizen.Wait(200)
+                local playing = IsEntityPlayingAnim(ped, dict, name, 3)
+                if playing then
+                    print("^2[ANIM FIND]^7   ✓✓ WORKS: '" .. name .. "' — THIS ONE PLAYS!")
+                end
+                ClearPedTasks(ped)
+            end
+        end
+    end
+    
+    -- Also try DoesAnimDictExist on a broader set
+    print("^2[ANIM FIND]^7 --- Broad DoesAnimDictExist check ---")
+    local broadDicts = {
+        "amb_work@world_human_tree_chop@male_a@base",
+        "amb_work@world_human_tree_chop@male_a@idle_a",
+        "amb_work@world_human_tree_chop@male_a",
+        "amb_work@world_human_axe@male_a@base",
+        "amb_work@world_human_axe@male_a",
+        "amb_work@world_human_pickaxe@male_a@base",
+        "amb_work@world_human_hammer@male_a@base",
+        "amb_work@world_human_hammer@male_a",
+        "amb_work@world_human_shovel@male_a@base",
+        "melee@hatchet@streamed_core",
+        "melee@knife@streamed_core",
+        "melee@unarmed@streamed_core",
+        "script_mechanics@axe@",
+    }
+    for _, d in ipairs(broadDicts) do
         local exists = DoesAnimDictExist(d)
         if exists then
-            print("^2[ANIM FIND]^7 DoesAnimDictExist ✓: " .. d)
+            print("^2[ANIM FIND]^7 ✓ Dict: " .. d)
         end
     end
 
     print("^2[ANIM FIND]^7 ========================================")
-    print("^2[ANIM FIND]^7 Search complete. Check ✓ items above.")
+    print("^2[ANIM FIND]^7 Search complete. Look for ✓✓ above.")
     print("^2[ANIM FIND]^7 ========================================")
 end)
 
