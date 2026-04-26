@@ -256,206 +256,98 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
     print("^2[Atlas Debug]^7 Position: (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
 end)
 
--- [[ ANIMATION TEST COMMAND ]]
--- Registers the /testanimation command to test various RDR2 animation dictionaries
--- Usage: /testanimation <alias> [duration_ms] [loop_flag]
--- Loops by default for 8 seconds unless a second argument is provided
-
--- Animation library with aliases
-local AnimationTests = {
-    -- amb_work@world_human_tree_chop@male_a@idle_a  (TREE CHOPPING IDLES)
-    { alias = "tree_idle_a",     dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_a_tree" },
-    { alias = "tree_idle_b",     dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_b_tree" },
-    { alias = "tree_idle_c",     dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_c_tree" },
-    { alias = "axe_idle_a",      dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_a_axe" },
-    { alias = "axe_idle_b",      dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_b_axe" },
-    { alias = "axe_idle_c",      dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_c_axe" },
-    { alias = "tree_a",          dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_a" },
-    { alias = "tree_b",          dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_b" },
-    { alias = "tree_c",          dict = "amb_work@world_human_tree_chop@male_a@idle_a",  anim = "idle_c" },
-
-    -- mech_skin@pelt_l@horse_satchel@stow@lt@toss  (PELT/HIDE HANDLING)
-    { alias = "pelt_enter_lf",   dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "enter_lf" },
-    { alias = "pelt_enter_rf",   dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "enter_rf_pelt" },
-    { alias = "pelt_base",       dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "base" },
-    { alias = "pelt_base_horse", dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "base_horse" },
-    { alias = "pelt_base_cam",   dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "base_camera" },
-    { alias = "pelt_lf_pelt",    dict = "mech_skin@pelt_l@horse_satchel@stow@lt@toss",  anim = "enter_lf_pelt" },
-
-    -- cam_anims@mockups@rabi3_endshot@main  (CAMERA ANIM)
-    { alias = "cam_player3",     dict = "cam_anims@mockups@rabi3_endshot@main",         anim = "@player_three_0" },
-
-    -- script_proc@robberies@homestead@lonnies_shack@hangout@enter  (ROBBERY HANGOUT ENTERS)
-    { alias = "rob_enter_bottle_lf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_lf_bottle" },
-    { alias = "rob_enter_outlaw_lf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_lf_outlaw_a" },
-    { alias = "rob_enter_chair_rf",  dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_rf_chair_a" },
-    { alias = "rob_enter_chair_lf",  dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_lf_chair_a" },
-    { alias = "rob_enter_outlaw_rf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_rf_outlaw_a" },
-    { alias = "rob_enter_player_rf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_rf_player" },
-    { alias = "rob_enter_player_lf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_lf_player" },
-    { alias = "rob_enter_bottle_rf", dict = "script_proc@robberies@homestead@lonnies_shack@hangout@enter", anim = "enter_rf_bottle" },
-
-    -- script_amb@stores@store_lean_shopkeeper_b  (SHOPKEEPER IDLES)
-    { alias = "shop_pos_react_a",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "pos_react_a" },
-    { alias = "shop_enter_gruff_lt", dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "enter_gruff_lt" },
-    { alias = "shop_impatient_a",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "impatient_react_a" },
-    { alias = "shop_impatient_b",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "impatient_react_b" },
-    { alias = "shop_long_idle_a",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "long_idle_a" },
-    { alias = "shop_long_idle_b",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "long_idle_b" },
-    { alias = "shop_idle_a",         dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "idle_a" },
-    { alias = "shop_idle_b",         dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "idle_b" },
-    { alias = "shop_idle_c",         dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "idle_c" },
-    { alias = "shop_neg_react_a",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "neg_react_a" },
-    { alias = "shop_neg_react_b",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "neg_react_b" },
-    { alias = "shop_neutral_a",      dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "neutral_react_a" },
-    { alias = "shop_neutral_b",      dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "neutral_react_b" },
-    { alias = "shop_enter_friend_rt",dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "enter_friendly_rt" },
-    { alias = "shop_enter_friend_lt",dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "enter_friendly_lt" },
-    { alias = "shop_enter_gruff_rt", dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "enter_gruff_rt" },
-    { alias = "shop_pos_react_b",    dict = "script_amb@stores@store_lean_shopkeeper_b", anim = "pos_react_b" },
-
-    -- amb_work@world_human_tree_chop@male_a@idle_b  (TREE CHOP IDLES - D/E/F variants)
-    { alias = "idle_d",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d" },
-    { alias = "idle_e",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e" },
-    { alias = "idle_f",           dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f" },
-    { alias = "idle_d_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d_axe" },
-    { alias = "idle_e_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e_axe" },
-    { alias = "idle_f_axe",       dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f_axe" },
-    { alias = "idle_d_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_d_tree" },
-    { alias = "idle_e_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_e_tree" },
-    { alias = "idle_f_tree",      dict = "amb_work@world_human_tree_chop@male_a@idle_b",  anim = "idle_f_tree" },
-
-    -- amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b  (PRE-SWING)
-    { alias = "preswing_d",       dict = "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b", anim = "idle_d" },
-    { alias = "preswing_d_axe",   dict = "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@idle_b", anim = "idle_d_axe" },
-
-    -- amb_work@world_human_tree_chop@working@male_a@idle_b  (WORKING CHOP)
-    { alias = "work_idle_d",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_d" },
-    { alias = "work_idle_e",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_e" },
-    { alias = "work_idle_f",      dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_f" },
-    { alias = "work_d_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_d_axe" },
-    { alias = "work_e_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_e_axe" },
-    { alias = "work_f_axe",       dict = "amb_work@world_human_tree_chop@working@male_a@idle_b", anim = "idle_f_axe" },
-
-    -- ai_react@male_stand@small_variations@b  (REACTIONS)
-    { alias = "react_f",          dict = "ai_react@male_stand@small_variations@b",       anim = "react_small_variations_f" },
-    { alias = "react_d",          dict = "ai_react@male_stand@small_variations@b",       anim = "react_small_variations_d" },
-    { alias = "react_e",          dict = "ai_react@male_stand@small_variations@b",       anim = "react_small_variations_e" },
-}
-
--- Lookup table for O(1) access
-local AnimationAliasMap = {}
-for _, entry in ipairs(AnimationTests) do
-    AnimationAliasMap[entry.alias] = entry
-end
-
-RegisterCommand('testanimation', function(source, args, rawCommand)
-    local alias = args[1]
-    local duration = tonumber(args[2]) or 8000
-    local loopFlag = (args[3] ~= "1") and 1 or 1  -- default to looping
-
-    if not alias then
-        print("^2[TESTANIM]^7 ========================================")
-        print("^2[TESTANIM]^7 Usage: /testanimation <alias> [duration_ms]")
-        print("^2[TESTANIM]^7 ========================================")
-        print("^3[TESTANIM]^7 --- TREE CHOP IDLES (idle_a) ---")
-        print("^7  tree_idle_a, tree_idle_b, tree_idle_c")
-        print("^7  axe_idle_a, axe_idle_b, axe_idle_c")
-        print("^7  tree_a, tree_b, tree_c")
-        print("^3[TESTANIM]^7 --- TREE CHOP IDLES (idle_b - D/E/F) ---")
-        print("^7  idle_d, idle_e, idle_f")
-        print("^7  idle_d_axe, idle_e_axe, idle_f_axe")
-        print("^7  idle_d_tree, idle_e_tree, idle_f_tree")
-        print("^3[TESTANIM]^7 --- PRE-SWING ---")
-        print("^7  preswing_d, preswing_d_axe")
-        print("^3[TESTANIM]^7 --- WORKING CHOP ---")
-        print("^7  work_idle_d, work_idle_e, work_idle_f")
-        print("^7  work_d_axe, work_e_axe, work_f_axe")
-        print("^3[TESTANIM]^7 --- PELT / ROBBERY / SHOPKEEPER / REACT ---")
-        print("^7  pelt_*, rob_*, shop_*, react_*")
-        print("^2[TESTANIM]^7 ========================================")
-        return
-    end
-
-    local entry = AnimationAliasMap[alias]
-    if not entry then
-        print("^1[TESTANIM]^7 Unknown alias: '" .. alias .. "'")
-        print("^1[TESTANIM]^7 Use /testanimation without args to see all aliases")
-        return
-    end
-
+-- [[ ANIMATION TEST ]]
+-- Tests either scenario or dict-based animations
+--   /testanim scenario <name> [duration_ms]     -> TaskStartScenarioInPlace
+--   /testanim dict <dict> <anim> [duration_ms]  -> TaskPlayAnim
+RegisterCommand('testanim', function(source, args, rawCommand)
+    local mode = args[1]
+    local duration = tonumber(args[#args] == tonumber(args[#args]) and args[#args] or nil) or 6000
     local ped = PlayerPedId()
-    local dict = entry.dict
-    local anim = entry.anim
 
-    print("^2[TESTANIM]^7 ========================================")
-    print("^2[TESTANIM]^7 Alias:    ^3" .. alias)
-    print("^2[TESTANIM]^7 Dict:     ^7" .. dict)
-    print("^2[TESTANIM]^7 Anim:     ^7" .. anim)
-    print("^2[TESTANIM]^7 Duration: ^7" .. duration .. "ms")
-    print("^2[TESTANIM]^7 ========================================")
-
-    -- Step 1: Clear any existing tasks
-    ClearPedTasks(ped)
-    Citizen.Wait(50)
-
-    -- Step 2: Check if dict exists
-    print("^3[TESTANIM]^7 [1/4] Checking if dictionary exists...")
-    local dictExists = DoesAnimDictExist(dict)
-    print("^3[TESTANIM]^7       DoesAnimDictExist: " .. tostring(dictExists))
-
-    -- Step 3: Request the dictionary
-    print("^3[TESTANIM]^7 [2/4] Requesting animation dictionary...")
-    RequestAnimDict(dict)
-    local loadStart = GetGameTimer()
-    local loadTimeout = 5000
-
-    while not HasAnimDictLoaded(dict) do
-        local elapsed = GetGameTimer() - loadStart
-        if elapsed > loadTimeout then
-            print("^1[TESTANIM]^7       TIMEOUT after " .. elapsed .. "ms — dict failed to load!")
-            print("^1[TESTANIM]^7       This dict/animation may not exist on this RedM build.")
+    if mode == "scenario" then
+        local scenarioName = args[2]
+        if not scenarioName then
+            print("^1[TESTANIM]^7 Usage: /testanim scenario <name> [duration_ms]")
             return
         end
-        Citizen.Wait(0)
-    end
-    local loadElapsed = GetGameTimer() - loadStart
-    print("^2[TESTANIM]^7       ✓ Dictionary loaded in " .. loadElapsed .. "ms")
+        print("^2[TESTANIM]^7 ========================================")
+        print("^2[TESTANIM]^7 Scenario: " .. scenarioName)
+        print("^2[TESTANIM]^7 Duration: " .. duration .. "ms")
 
-    -- Step 4: Play the animation
-    print("^3[TESTANIM]^7 [3/4] Starting animation...")
-    -- Flag 1 = loop, 0 blend flags = standard blending
-    TaskPlayAnim(ped, dict, anim, 1.0, -1.0, duration, 1, 0, false, false, false)
-    Citizen.Wait(150)
+        ClearPedTasks(ped)
+        Citizen.Wait(50)
+        
+        print("^3[TESTANIM]^7 [1] Starting TaskStartScenarioInPlace...")
+        TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), -1, true, false, false, false)
+        Citizen.Wait(200)
+        
+        local active = pcall(function() return IsPedActiveInScenario(ped) end)
+        local still = IsPedStill(ped)
+        print("^3[TESTANIM]^7     IsPedActiveInScenario: " .. tostring(active))
+        print("^3[TESTANIM]^7     IsPedStill: " .. tostring(still))
 
-    -- Verify it's actually playing
-    local isPlaying = IsEntityPlayingAnim(ped, dict, anim, 3)
-    print("^3[TESTANIM]^7       IsEntityPlayingAnim: " .. tostring(isPlaying))
-    if isPlaying then
-        print("^2[TESTANIM]^7       ✓ Animation is playing on ped!")
+        print("^3[TESTANIM]^7 [2] Running for " .. duration .. "ms...")
+        Citizen.Wait(duration)
+        ClearPedTasks(ped)
+        print("^2[TESTANIM]^7 Done.")
+        print("^2[TESTANIM]^7 ========================================")
+
+    elseif mode == "dict" then
+        local dict = args[2]
+        local anim = args[3]
+        if not dict or not anim then
+            print("^1[TESTANIM]^7 Usage: /testanim dict <dict> <anim> [duration_ms]")
+            return
+        end
+        print("^2[TESTANIM]^7 ========================================")
+        print("^2[TESTANIM]^7 Dict:     " .. dict)
+        print("^2[TESTANIM]^7 Anim:     " .. anim)
+        print("^2[TESTANIM]^7 Duration: " .. duration .. "ms")
+
+        ClearPedTasks(ped)
+        Citizen.Wait(50)
+
+        print("^3[TESTANIM]^7 [1] DoesAnimDictExist: " .. tostring(DoesAnimDictExist(dict)))
+
+        print("^3[TESTANIM]^7 [2] Loading dict...")
+        RequestAnimDict(dict)
+        local t = GetGameTimer()
+        while not HasAnimDictLoaded(dict) do
+            if GetGameTimer() - t > 5000 then
+                print("^1[TESTANIM]^7     TIMEOUT")
+                return
+            end
+            Citizen.Wait(0)
+        end
+        print("^2[TESTANIM]^7     Loaded in " .. (GetGameTimer() - t) .. "ms")
+
+        print("^3[TESTANIM]^7 [3] Playing...")
+        TaskPlayAnim(ped, dict, anim, 1.0, -1.0, duration, 1, 0, false, false, false)
+        Citizen.Wait(150)
+        print("^3[TESTANIM]^7     IsPlaying: " .. tostring(IsEntityPlayingAnim(ped, dict, anim, 3)))
+
+        print("^3[TESTANIM]^7 [4] Running for " .. duration .. "ms...")
+        Citizen.Wait(duration)
+        StopAnimTask(ped, dict, anim, 1.0)
+        RemoveAnimDict(dict)
+        ClearPedTasks(ped)
+        print("^2[TESTANIM]^7 Done.")
+        print("^2[TESTANIM]^7 ========================================")
+
     else
-        print("^1[TESTANIM]^7       ⚠ Animation reported as NOT playing")
-        print("^1[TESTANIM]^7       (may be playing but not detected, wait and see)")
+        print("^2[TESTANIM]^7 Usage:")
+        print("^2[TESTANIM]^7   /testanim scenario <name> [duration]")
+        print("^2[TESTANIM]^7   /testanim dict <dict> <anim> [duration]")
+        print("^2[TESTANIM]^7 ")
+        print("^2[TESTANIM]^7 Known working tree chop dicts:")
+        print("^2[TESTANIM]^7   amb_work@world_human_tree_chop@male_a@idle_a")
+        print("^2[TESTANIM]^7   anims: idle_b, idle_b_tree, idle_a, idle_a_tree")
+        print("^2[TESTANIM]^7 ")
+        print("^2[TESTANIM]^7 Known scenarios:")
+        print("^2[TESTANIM]^7   WORLD_HUMAN_TREE_CHOP")
+        print("^2[TESTANIM]^7   WORLD_HUMAN_GARDENER_PLANT")
     end
-
-    -- Step 5: Wait for duration, then cleanup
-    print("^3[TESTANIM]^7 [4/4] Waiting " .. duration .. "ms then cleaning up...")
-    Citizen.Wait(duration)
-
-    -- Cleanup
-    StopAnimTask(ped, dict, anim, 1.0)
-    RemoveAnimDict(dict)
-    ClearPedTasks(ped)
-    print("^2[TESTANIM]^7       ✓ Animation stopped, dict removed, tasks cleared")
-    print("^2[TESTANIM]^7 ========================================")
-    print("^2[TESTANIM]^7 Test complete for: " .. alias)
-    print("^2[TESTANIM]^7 ========================================")
-end)
-
--- Legacy alias: /testanim redirects to /testanimation
-RegisterCommand('testanim', function(source, args, rawCommand)
-    -- Re-route to testanimation
-    ExecuteCommand('testanimation ' .. table.concat(args, ' '))
 end)
 
 -- [[ EVENTS ]]
