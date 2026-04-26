@@ -257,12 +257,14 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
 end)
 
 -- [[ ANIMATION TEST ]]
--- Tests either scenario or dict-based animations
---   /testanim scenario <name> [duration_ms]     -> TaskStartScenarioInPlace
---   /testanim dict <dict> <anim> [duration_ms]  -> TaskPlayAnim
+-- Tests various animation approaches
+--   /testanim scenario <name> [duration]      -> Scenario only
+--   /testanim dict <dict> <anim> [duration]   -> TaskPlayAnim
+--   /testanim axe <model> [scenario] [dur]    -> Attach axe prop + scenario
 RegisterCommand('testanim', function(source, args, rawCommand)
     local mode = args[1]
-    local duration = tonumber(args[#args] == tonumber(args[#args]) and args[#args] or nil) or 6000
+    local duration = tonumber(args[#args]) or 6000
+    if type(duration) ~= "number" then duration = 6000 end
     local ped = PlayerPedId()
 
     if mode == "scenario" then
@@ -287,7 +289,7 @@ RegisterCommand('testanim', function(source, args, rawCommand)
         print("^3[TESTANIM]^7     IsPedActiveInScenario: " .. tostring(active))
         print("^3[TESTANIM]^7     IsPedStill: " .. tostring(still))
 
-        print("^3[TESTANIM]^7 [2] Running for " .. duration .. "ms...")
+        print("^3[TESTANIM]^7 [2] Running " .. duration .. "ms...")
         Citizen.Wait(duration)
         ClearPedTasks(ped)
         print("^2[TESTANIM]^7 Done.")
@@ -309,7 +311,6 @@ RegisterCommand('testanim', function(source, args, rawCommand)
         Citizen.Wait(50)
 
         print("^3[TESTANIM]^7 [1] DoesAnimDictExist: " .. tostring(DoesAnimDictExist(dict)))
-
         print("^3[TESTANIM]^7 [2] Loading dict...")
         RequestAnimDict(dict)
         local t = GetGameTimer()
@@ -327,7 +328,7 @@ RegisterCommand('testanim', function(source, args, rawCommand)
         Citizen.Wait(150)
         print("^3[TESTANIM]^7     IsPlaying: " .. tostring(IsEntityPlayingAnim(ped, dict, anim, 3)))
 
-        print("^3[TESTANIM]^7 [4] Running for " .. duration .. "ms...")
+        print("^3[TESTANIM]^7 [4] Running " .. duration .. "ms...")
         Citizen.Wait(duration)
         StopAnimTask(ped, dict, anim, 1.0)
         RemoveAnimDict(dict)
@@ -335,18 +336,68 @@ RegisterCommand('testanim', function(source, args, rawCommand)
         print("^2[TESTANIM]^7 Done.")
         print("^2[TESTANIM]^7 ========================================")
 
+    elseif mode == "axe" then
+        local axeModel = args[2] or "p_axe01x"
+        local scenarioName = args[3] or "WORLD_HUMAN_TREE_CHOP"
+        local axeHash = GetHashKey(axeModel)
+
+        print("^2[TESTANIM]^7 ========================================")
+        print("^2[TESTANIM]^7 Axe:      " .. axeModel)
+        print("^2[TESTANIM]^7 Scenario: " .. scenarioName)
+        print("^2[TESTANIM]^7 Duration: " .. duration .. "ms")
+
+        ClearPedTasks(ped)
+        Citizen.Wait(50)
+
+        -- Load and attach axe
+        print("^3[TESTANIM]^7 [1] Loading axe model...")
+        RequestModel(axeHash)
+        local t = GetGameTimer()
+        while not HasModelLoaded(axeHash) do
+            if GetGameTimer() - t > 5000 then
+                print("^1[TESTANIM]^7     TIMEOUT — model: " .. axeModel)
+                return
+            end
+            Citizen.Wait(0)
+        end
+        print("^2[TESTANIM]^7     Loaded in " .. (GetGameTimer() - t) .. "ms")
+
+        print("^3[TESTANIM]^7 [2] Creating & attaching axe to right hand...")
+        local axeObj = CreateObject(axeHash, GetEntityCoords(ped), true, true, true)
+        local boneIndex = GetEntityBoneIndexByName(ped, "PH_R_HAND")
+        AttachEntityToEntity(axeObj, ped, boneIndex,
+            0.0, 0.0, 0.0,   -- x, y, z offset
+            0.0, 0.0, 0.0,   -- rotation x, y, z
+            true, false, false, false, 2, true)
+
+        -- Start scenario
+        print("^3[TESTANIM]^7 [3] Starting scenario...")
+        TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), -1, true, false, false, false)
+        Citizen.Wait(200)
+        local active = pcall(function() return IsPedActiveInScenario(ped) end)
+        print("^3[TESTANIM]^7     IsPedActiveInScenario: " .. tostring(active))
+
+        print("^3[TESTANIM]^7 [4] Running " .. duration .. "ms...")
+        Citizen.Wait(duration)
+
+        -- Cleanup
+        ClearPedTasks(ped)
+        if DoesEntityExist(axeObj) then
+            DeleteEntity(axeObj)
+        end
+        SetModelAsNoLongerNeeded(axeHash)
+        print("^2[TESTANIM]^7 Done (axe deleted).")
+        print("^2[TESTANIM]^7 ========================================")
+
     else
         print("^2[TESTANIM]^7 Usage:")
-        print("^2[TESTANIM]^7   /testanim scenario <name> [duration]")
         print("^2[TESTANIM]^7   /testanim dict <dict> <anim> [duration]")
+        print("^2[TESTANIM]^7   /testanim scenario <name> [duration]")
+        print("^2[TESTANIM]^7   /testanim axe [model] [scenario] [duration]")
         print("^2[TESTANIM]^7 ")
-        print("^2[TESTANIM]^7 Known working tree chop dicts:")
-        print("^2[TESTANIM]^7   amb_work@world_human_tree_chop@male_a@idle_a")
-        print("^2[TESTANIM]^7   anims: idle_b, idle_b_tree, idle_a, idle_a_tree")
-        print("^2[TESTANIM]^7 ")
-        print("^2[TESTANIM]^7 Known scenarios:")
-        print("^2[TESTANIM]^7   WORLD_HUMAN_TREE_CHOP")
-        print("^2[TESTANIM]^7   WORLD_HUMAN_GARDENER_PLANT")
+        print("^2[TESTANIM]^7 Examples:")
+        print("^2[TESTANIM]^7   /testanim dict amb_work@world_human_tree_chop@male_a@idle_a idle_b")
+        print("^2[TESTANIM]^7   /testanim axe p_axe01x WORLD_HUMAN_TREE_CHOP 6000")
     end
 end)
 
