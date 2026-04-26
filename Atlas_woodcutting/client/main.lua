@@ -3,7 +3,13 @@ local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stum
 local RenderedForests = {} -- Forests currently being rendered
 local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
--- Progress bar drawing function (define first)
+-- VORP Lumberjack-style animation variables
+local tool, hastool = nil, false
+local swing = 0
+local active = false
+local UsePrompt, PropPrompt
+
+-- Enhanced progress bar with animation status (from ANIMATION_SYSTEM.md)
 local function DrawProgressBar(progress)
     -- Only draw if progress is valid
     if not progress or progress < 0 or progress > 1 then
@@ -31,12 +37,23 @@ local function DrawProgressBar(progress)
     DrawRect(x - (barWidth / 2) + 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Left
     DrawRect(x + (barWidth / 2) - 0.001, y, 0.002, barHeight, 255, 255, 255, 255) -- Right
 
-    -- Progress text
+    -- Enhanced progress text with animation status indicator
     SetTextScale(0.4, 0.4)
     SetTextColor(255, 255, 255, 255)
     SetTextCentre(true)
     SetTextFontForCurrentCommand(1)
-    local progressText = "Chopping... " .. math.floor(progress * 100) .. "%"
+    
+    -- Animation status indicator (like ANIMATION_SYSTEM.md)
+    local animationIndicator = "✓" -- Assume animation is working
+    if not hastool then
+        animationIndicator = "⚠" -- Warning if no tool equipped
+    end
+    
+    local progressText = animationIndicator .. " Chopping... " .. math.floor(progress * 100) .. "%"
+    if swing > 0 then
+        progressText = animationIndicator .. " Swing " .. swing .. " - " .. math.floor(progress * 100) .. "%"
+    end
+    
     DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), x, y + 0.04)
 end
 
@@ -54,6 +71,90 @@ Citizen.CreateThread(function()
         end
     end
 end)
+
+-- VORP Lumberjack-style Animation Functions (copied from VORP lumberjack)
+local function Anim(actor, dict, body, duration, flags, introtiming, exittiming)
+    CreateThread(function()
+        RequestAnimDict(dict)
+        local dur = duration or -1
+        local flag = flags or 1
+        local intro = tonumber(introtiming) or 1.0
+        local exit = tonumber(exittiming) or 1.0
+        local timeout = 5
+        while (not HasAnimDictLoaded(dict) and timeout > 0) do
+            timeout = timeout - 1
+            if timeout == 0 then
+                print("Animation Failed to Load")
+            end
+            Wait(300)
+        end
+        TaskPlayAnim(actor, dict, body, intro, exit, dur, flag, 1, false, 0, false, "", true)
+    end)
+end
+
+local function releasePlayer()
+    if PropPrompt then
+        -- UiPromptSetEnabled(PropPrompt, false)
+        -- UiPromptSetVisible(PropPrompt, false)
+    end
+
+    if UsePrompt then
+        -- UiPromptSetEnabled(UsePrompt, false)
+        -- UiPromptSetVisible(UsePrompt, false)
+    end
+
+    FreezeEntityPosition(PlayerPedId(), false)
+end
+
+local function removeToolFromPlayer()
+    hastool = false
+
+    if not tool then
+        return
+    end
+    local ped = PlayerPedId()
+    Citizen.InvokeNative(0xED00D72F81CF7278, tool, 1, 1)
+    DeleteObject(tool)
+    Citizen.InvokeNative(0x58F7DB5BD8FA2288, ped) -- Cancel Walk Style
+    
+    -- Add safety checks for these natives
+    local success1 = pcall(function()
+        ClearPedDesiredLocoForModel(ped)
+    end)
+    
+    local success2 = pcall(function()
+        ClearPedDesiredLocoMotionType(ped)
+    end)
+    
+    if not success1 or not success2 then
+        print("^3[Atlas Woodcutting]^7 Some loco natives failed (expected in some RedM builds)")
+    end
+
+    tool = nil
+end
+
+local function EquipTool(toolhash)
+    hastool = false
+    -- Citizen.InvokeNative(0x6A2F820452017EA2) -- Clear Prompts from Screen
+    if tool then
+        DeleteEntity(tool)
+    end
+    Wait(500)
+    
+    local ped = PlayerPedId()
+    local coords = GetOffsetFromEntityInWorldCoords(ped, 0.0, 0.0, 0.0)
+    tool = CreateObject(toolhash, coords.x, coords.y, coords.z, true, false, false, false)
+    AttachEntityToEntity(tool, ped, GetPedBoneIndex(ped, 7966), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, false, false, false,
+        2, true, false, false)
+    Citizen.InvokeNative(0x923583741DC87BCE, ped, 'arthur_healthy')
+    Citizen.InvokeNative(0x89F5E7ADECCCB49C, ped, "carry_pitchfork")
+    Citizen.InvokeNative(0x2208438012482A1A, ped, true, true)
+    ForceEntityAiAndAnimationUpdate(tool, true)
+    Citizen.InvokeNative(0x3A50753042B6891B, ped, "PITCH_FORKS")
+
+    Wait(500)
+    hastool = true
+end
 
 -- [[ UI ]]
 local function DrawWoodcuttingPrompt()
@@ -256,8 +357,71 @@ RegisterCommand('spawntree', function(source, args, rawCommand)
     print("^2[Atlas Debug]^7 Position: (" .. spawnX .. ", " .. spawnY .. ", " .. spawnZ .. ")")
 end)
 
+-- List available animation scenarios (like VORP lumberjack system)
+RegisterCommand('listscenarios', function()
+    print("^2[Atlas Woodcutting]^7 Available Animation Scenarios (Priority Order):")
+    print("^3================================================^7")
+    for i, scenario in ipairs(AtlasWoodConfig.Animations.scenarios) do
+        print("^2 " .. i .. ". ^7" .. scenario)
+    end
+    print("^3================================================^7")
+    print("^3Usage:^7 /testanim scenario [name] [duration]")
+end)
+
+-- Test specific scenario directly (like VORP lumberjack system) 
+RegisterCommand('testscenario', function(source, args, rawCommand)
+    if not args[1] then
+        print("^1[Atlas Woodcutting]^7 Usage: /testscenario [scenario_name] [duration_ms]")
+        return
+    end
+    
+    local scenarioName = args[1]
+    local duration = tonumber(args[2]) or 5000
+    local ped = PlayerPedId()
+    
+    print("^2[TEST SCENARIO]^7 Testing scenario: " .. scenarioName .. " for " .. duration .. "ms")
+    
+    ClearPedTasks(ped)
+    Wait(50)
+    
+    TaskStartScenarioInPlace(ped, GetHashKey(scenarioName), -1, true, false, false, false)
+    
+    Citizen.SetTimeout(duration, function()
+        ClearPedTasks(ped)
+        print("^2[TEST SCENARIO]^7 Scenario test completed")
+    end)
+end)
+
+-- Test complete chopping animation (like VORP lumberjack system)
+RegisterCommand('testchopanimation', function(source, args, rawCommand)
+    local duration = tonumber(args[1]) or 10000
+    local ped = PlayerPedId()
+    
+    print("^2[TEST CHOP ANIMATION]^7 Testing complete chopping system for " .. duration .. "ms")
+    
+    -- Simulate the full chopping experience
+    EquipTool(GetHashKey('p_axe02x'))
+    TaskStartScenarioInPlace(ped, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
+    
+    -- Test swing animation after 2 seconds
+    Citizen.SetTimeout(2000, function()
+        if hastool then
+            print("^3[TEST CHOP ANIMATION]^7 Testing swing animation...")
+            Anim(ped, "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@trans", "pre_swing_trans_after_swing", -1, 0)
+        end
+    end)
+    
+    -- Cleanup after duration
+    Citizen.SetTimeout(duration, function()
+        ClearPedTasks(ped)
+        removeToolFromPlayer()
+        releasePlayer()
+        print("^2[TEST CHOP ANIMATION]^7 Complete animation test finished")
+    end)
+end)
+
 -- [[ ANIMATION TEST ]]
--- Tests various animation approaches
+-- Tests various animation approaches (enhanced version of original)
 --   /testanim scenario <name> [duration]      -> Scenario only
 --   /testanim dict <dict> <anim> [duration]   -> TaskPlayAnim
 --   /testanim axe <model> [scenario] [dur]    -> Attach axe prop + scenario
@@ -526,6 +690,51 @@ AddEventHandler('atlas_woodcutting:client:spawnSingleNode', function(node, fores
     SpawnLocalTree(node, forestId, treeIndex, false)
 end)
 
+-- Admin animation test event (triggered by server)
+RegisterNetEvent('atlas_woodcutting:client:adminAnimTest')
+AddEventHandler('atlas_woodcutting:client:adminAnimTest', function(duration)
+    print("^2[ADMIN ANIM TEST]^7 Animation test triggered by admin for " .. duration .. "ms")
+    
+    local ped = PlayerPedId()
+    
+    -- Test the full VORP lumberjack animation system
+    EquipTool(GetHashKey('p_axe02x'))
+    
+    -- Start tree chop scenario
+    TaskStartScenarioInPlace(ped, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
+    
+    -- Test swing animation after a delay
+    Citizen.SetTimeout(2000, function()
+        if hastool then
+            print("^3[ADMIN ANIM TEST]^7 Testing swing animation...")
+            Anim(ped, "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@trans", "pre_swing_trans_after_swing", -1, 0)
+        end
+    end)
+    
+    -- Cleanup after duration
+    Citizen.SetTimeout(duration, function()
+        ClearPedTasks(ped)
+        removeToolFromPlayer()
+        releasePlayer()
+        print("^2[ADMIN ANIM TEST]^7 Admin animation test completed")
+    end)
+end)
+
+-- Real-time configuration update event
+RegisterNetEvent('atlas_woodcutting:client:updateConfig')
+AddEventHandler('atlas_woodcutting:client:updateConfig', function(configKey, newValue)
+    if configKey == 'ChopAnimationTime' then
+        AtlasWoodConfig.ChopAnimationTime = newValue
+        print("^2[CONFIG UPDATE]^7 ChopAnimationTime updated to " .. newValue .. "ms")
+    elseif configKey == 'maxMovementDistance' then
+        AtlasWoodConfig.Animations.interruption.maxMovementDistance = newValue
+        print("^2[CONFIG UPDATE]^7 Max movement distance updated to " .. newValue .. "m")
+    elseif configKey == 'checkInterval' then
+        AtlasWoodConfig.Animations.interruption.checkInterval = newValue
+        print("^2[CONFIG UPDATE]^7 Check interval updated to " .. newValue .. "ms")
+    end
+end)
+
 Citizen.CreateThread(function()
     Citizen.Wait(5000)
     TriggerServerEvent('atlas_woodcutting:server:playerLoaded')
@@ -562,8 +771,10 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
     print("^2[CHOP FLOW]^7 Setting isBusy = true")
     isBusy = true
+    active = true
     isChopping = true
     choppingProgress = 0.0
+    swing = 0
 
     local playerPed = PlayerPedId()
     local startCoords = GetEntityCoords(playerPed)
@@ -571,45 +782,71 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     local duration = AtlasWoodConfig.ChopAnimationTime
     local interrupted = false
 
-    -- Start basic chopping animation (REVERT TO ORIGINAL WORKING VERSION)
-    print("^2[CHOP FLOW]^7 Starting chopping animation...")
-    TaskStartScenarioInPlace(playerPed, GetHashKey("WORLD_HUMAN_TREE_CHOP"), -1, true)
-
-    -- Progress thread (REVERT TO ORIGINAL WORKING VERSION)
+    -- Start VORP lumberjack-style chopping system
+    print("^2[CHOP FLOW]^7 Starting VORP-style chopping animation...")
+    
+    -- Equip the axe tool (like VORP lumberjack)
+    EquipTool(GetHashKey('p_axe02x'))
+    
+    -- Simulate the swinging system from VORP lumberjack
+    local swingcount = math.random(3, 8) -- Random number of swings needed
+    
+    -- Progress and animation thread (VORP lumberjack style)
     Citizen.CreateThread(function()
-        print("^2[CHOP FLOW]^7 Starting progress thread - Duration: " .. duration .. "ms")
+        print("^2[CHOP FLOW]^7 Starting VORP-style progress thread - Duration: " .. duration .. "ms")
+        print("^2[CHOP FLOW]^7 Required swings: " .. swingcount)
 
-        while GetGameTimer() - startTime < duration and not interrupted do
-            local currentTime = GetGameTimer()
-            choppingProgress = math.min((currentTime - startTime) / duration, 1.0)
+        while hastool and active and not interrupted do
+            FreezeEntityPosition(playerPed, true)
 
-            -- Debug: Print progress every second
-            local elapsedTime = currentTime - startTime
-            if elapsedTime % 1000 < 100 then -- Every ~1 second
-                print("^3[PROGRESS DEBUG]^7 " ..
-                math.floor(choppingProgress * 100) .. "% (" .. math.floor(elapsedTime) .. "ms / " .. duration .. "ms)")
-                print("^3[PROGRESS DEBUG]^7 isChopping: " ..
-                tostring(isChopping) .. " | choppingProgress: " .. choppingProgress)
-            end
-
-            -- Check for movement interruption (simple distance check)
+            -- Check for movement interruption
             local currentCoords = GetEntityCoords(playerPed)
             local distance = #(startCoords - currentCoords)
-
-            if distance > 2.0 then
+            
+            if distance > 2.5 then
                 print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
                 interrupted = true
                 break
             end
 
-            Citizen.Wait(100) -- Check every 100ms
+            -- Check if player is dead or dying
+            if IsPedDeadOrDying(playerPed, false) then
+                print("^1[CHOP FLOW]^7 Interrupted - Player died")
+                interrupted = true
+                break
+            end
+
+            -- Simulate automatic swinging (like VORP's minigame success)
+            if swing < swingcount then
+                swing = swing + 1
+                choppingProgress = swing / swingcount
+                
+                print("^3[CHOP FLOW]^7 Swing " .. swing .. "/" .. swingcount .. " (" .. math.floor(choppingProgress * 100) .. "%)")
+                
+                -- Play swing animation (like VORP lumberjack)
+                Anim(playerPed, "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@trans", "pre_swing_trans_after_swing", -1, 0)
+                
+                -- Wait between swings (simulate minigame timing)
+                Wait(1500 + math.random(500, 1000)) -- 1.5-2.5 seconds between swings
+            else
+                -- All swings completed
+                print("^2[CHOP FLOW]^7 All swings completed!")
+                break
+            end
+
+            Wait(100) -- Check every 100ms
         end
 
-        -- Cleanup
+        -- Cleanup (VORP lumberjack style)
         isChopping = false
         choppingProgress = 0.0
+        active = false
+        swing = 0
+        
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
         ClearPedTasks(playerPed)
+        removeToolFromPlayer()
+        releasePlayer()
 
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
