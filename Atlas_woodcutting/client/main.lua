@@ -9,6 +9,10 @@ local swing = 0
 local active = false
 local UsePrompt, PropPrompt
 
+-- Progress bar state
+local isChopping = false
+local choppingProgress = 0.0
+
 -- Enhanced progress bar with animation status (from ANIMATION_SYSTEM.md)
 local function DrawProgressBar(progress)
     -- Only draw if progress is valid
@@ -56,10 +60,6 @@ local function DrawProgressBar(progress)
     
     DisplayText(CreateVarString(10, "LITERAL_STRING", progressText), x, y + 0.04)
 end
-
--- Progress bar state
-local isChopping = false
-local choppingProgress = 0.0
 
 -- Render thread for smooth progress bar
 Citizen.CreateThread(function()
@@ -762,10 +762,7 @@ AddEventHandler('atlas_woodcutting:client:generateForestNodes', function(fId, ce
     end
 end)
 
-
-
-
-
+-- Enhanced Chopping System with Advanced Interruption Detection
 RegisterNetEvent('atlas_woodcutting:client:beginMinigame')
 AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     print("^2[CHOP FLOW]^7 beginMinigame [CLIENT] - Token: " .. token)
@@ -791,65 +788,121 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     -- Simulate the swinging system from VORP lumberjack
     local swingcount = math.random(3, 8) -- Random number of swings needed
     
-    -- Progress and animation thread (VORP lumberjack style)
+    -- Enhanced interruption monitoring thread
+    local lastSwingTime = 0
+    local swingInProgress = false
+    local playerStartHealth = GetEntityHealth(playerPed)
+    local interruptionReason = nil
+    
     Citizen.CreateThread(function()
-        print("^2[CHOP FLOW]^7 Starting VORP-style progress thread - Duration: " .. duration .. "ms")
-        print("^2[CHOP FLOW]^7 Required swings: " .. swingcount)
-
+        print("^2[CHOP FLOW]^7 Starting enhanced interruption monitoring...")
+        
         while hastool and active and not interrupted do
-            FreezeEntityPosition(playerPed, true)
-
-            -- Check for movement interruption
-            local currentCoords = GetEntityCoords(playerPed)
-            local distance = #(startCoords - currentCoords)
+            -- DON'T freeze player - let them move naturally and detect movement input
+            -- FreezeEntityPosition(playerPed, true) -- Removed this line
             
-            if distance > 2.5 then
-                print("^1[CHOP FLOW]^7 Interrupted - Player moved too far")
+            local currentTime = GetGameTimer()
+            local currentCoords = GetEntityCoords(playerPed)
+            local currentHealth = GetEntityHealth(playerPed)
+            
+            -- 1. MOVEMENT INPUT DETECTION (WASD keys)
+            local movementDetected = false
+            
+            -- Check for movement input (all directional keys)
+            if IsControlPressed(0, 0x8FD015D8) or  -- W (INPUT_MOVE_UP_ONLY)
+               IsControlPressed(0, 0xD27782E3) or  -- S (INPUT_MOVE_DOWN_ONLY) 
+               IsControlPressed(0, 0x7065027D) or  -- A (INPUT_MOVE_LEFT_ONLY)
+               IsControlPressed(0, 0xB4E465B4) or  -- D (INPUT_MOVE_RIGHT_ONLY)
+               IsControlPressed(0, 0x3D99EEC6) or  -- Left Stick Movement
+               IsControlPressed(0, 0x0499D4A5) then -- Right Stick Movement
+                movementDetected = true
+                interruptionReason = "Movement input detected (player tried to move)"
+            end
+            
+            -- 2. POSITION CHANGE DETECTION (backup method)
+            local distance = #(startCoords - currentCoords)
+            if distance > 1.0 then -- Much smaller threshold since we're not freezing
+                movementDetected = true
+                interruptionReason = "Player moved " .. string.format("%.1fm", distance) .. " from start position"
+            end
+            
+            -- 3. HEALTH/DAMAGE DETECTION
+            if currentHealth < playerStartHealth then
                 interrupted = true
+                interruptionReason = "Player took damage (health: " .. playerStartHealth .. " → " .. currentHealth .. ")"
+                print("^1[CHOP FLOW]^7 Interrupted - " .. interruptionReason)
                 break
             end
-
-            -- Check if player is dead or dying
+            
+            -- 4. DEATH/DYING DETECTION
             if IsPedDeadOrDying(playerPed, false) then
-                print("^1[CHOP FLOW]^7 Interrupted - Player died")
                 interrupted = true
+                interruptionReason = "Player died or is dying"
+                print("^1[CHOP FLOW]^7 Interrupted - " .. interruptionReason)
                 break
             end
-
-            -- Simulate automatic swinging (like VORP's minigame success)
-            if swing < swingcount then
-                swing = swing + 1
-                choppingProgress = swing / swingcount
-                
-                print("^3[CHOP FLOW]^7 Swing " .. swing .. "/" .. swingcount .. " (" .. math.floor(choppingProgress * 100) .. "%)")
-                
-                -- Play swing animation (like VORP lumberjack)
-                Anim(playerPed, "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@trans", "pre_swing_trans_after_swing", -1, 0)
-                
-                -- Wait between swings (simulate minigame timing)
-                Wait(1500 + math.random(500, 1000)) -- 1.5-2.5 seconds between swings
-            else
-                -- All swings completed
-                print("^2[CHOP FLOW]^7 All swings completed!")
+            
+            -- 5. COMBAT DETECTION (if player enters combat)
+            if IsPedInCombat(playerPed, 0) then
+                interrupted = true
+                interruptionReason = "Player entered combat"
+                print("^1[CHOP FLOW]^7 Interrupted - " .. interruptionReason)
                 break
             end
+            
+            -- 6. MOVEMENT INPUT INTERRUPTION
+            if movementDetected then
+                interrupted = true
+                print("^1[CHOP FLOW]^7 Interrupted - " .. interruptionReason)
+                break
+            end
+            
+            -- 7. SWING PROGRESSION (only if not interrupted)
+            if not swingInProgress and (currentTime - lastSwingTime) > (1500 + math.random(500, 1000)) then
+                if swing < swingcount then
+                    swingInProgress = true
+                    swing = swing + 1
+                    choppingProgress = swing / swingcount
+                    
+                    print("^3[CHOP FLOW]^7 Swing " .. swing .. "/" .. swingcount .. " (" .. math.floor(choppingProgress * 100) .. "%)")
+                    
+                    -- Play swing animation (like VORP lumberjack)
+                    Anim(playerPed, "amb_work@world_human_tree_chop_new@working@pre_swing@male_a@trans", "pre_swing_trans_after_swing", -1, 0)
+                    
+                    lastSwingTime = currentTime
+                    swingInProgress = false
+                else
+                    -- All swings completed
+                    print("^2[CHOP FLOW]^7 All swings completed!")
+                    break
+                end
+            end
 
-            Wait(100) -- Check every 100ms
+            Wait(50) -- Check every 50ms for responsive interruption detection
         end
 
-        -- Cleanup (VORP lumberjack style)
+        -- Enhanced cleanup with interruption reason
         isChopping = false
         choppingProgress = 0.0
         active = false
         swing = 0
         
         print("^2[CHOP FLOW]^7 Progress complete - Interrupted: " .. tostring(interrupted))
+        if interrupted and interruptionReason then
+            print("^3[CHOP FLOW]^7 Interruption reason: " .. interruptionReason)
+        end
+        
         ClearPedTasks(playerPed)
         removeToolFromPlayer()
         releasePlayer()
 
         if interrupted then
             print("^1[CHOP FLOW]^7 Chopping interrupted!")
+            -- Show interruption message to player
+            if interruptionReason then
+                -- You could add a notification here if you want:
+                -- TriggerEvent('vorp:TipBottom', interruptionReason, 3000)
+            end
             isBusy = false
         else
             print("^2[CHOP FLOW]^7 Sending finishChop to server")
