@@ -258,7 +258,8 @@ local function ProcessMiningLoot(source, campTier)
 
     if not success then
         print("^1[Atlas Mining]^7 Error getting player level for loot: " .. tostring(playerLevel))
-        return false -- Return false to indicate no bonus loot
+        print("^3[Atlas Mining]^7 Using fallback level 1 for loot calculation")
+        playerLevel = 1 -- Use fallback level instead of failing
     end
 
     -- Get player's pickaxe tier

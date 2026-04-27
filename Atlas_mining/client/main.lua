@@ -510,10 +510,17 @@ local function DrawMiningProgressBar()
     -- Background (dark grey)
     DrawRect(x, y, width, height, 64, 64, 64, 200)
     
-    -- Progress fill (green) - only show if there's progress
-    if progress > 0 then
-        local fillWidth = width * progress
-        DrawRect(x - (width/2) + (fillWidth/2), y, fillWidth, height, 0, 255, 0, 255)
+    -- Empty progress sections (light grey)
+    local sectionWidth = width / miningProgress.hitsRequired
+    for i = 1, miningProgress.hitsRequired do
+        local sectionX = x - (width/2) + (sectionWidth * (i - 0.5))
+        if i <= miningProgress.hitsCompleted then
+            -- Completed section (green)
+            DrawRect(sectionX, y, sectionWidth * 0.95, height * 0.9, 0, 255, 0, 255)
+        else
+            -- Uncompleted section (light grey)
+            DrawRect(sectionX, y, sectionWidth * 0.95, height * 0.9, 128, 128, 128, 255)
+        end
     end
     
     -- Border (white)
@@ -556,8 +563,8 @@ local function DoMiningHit()
         
         -- Play mining sound effect (pickaxe hitting rock)
         local coords = GetEntityCoords(ped)
-        -- Using a generic "rock hit" sound from RDR2's audio system
-        Citizen.InvokeNative(0x67C540AA08E4A6F5, "Core_Hunting_Ore_Hit_Successful_01", coords.x, coords.y, coords.z, "HUD_SHOP_SOUNDSET", false, 0, false)
+        -- Try different RDR2 mining/hitting sounds
+        Citizen.InvokeNative(0x67C540AA08E4A6F5, "CHECKPOINT_PERFECT", coords.x, coords.y, coords.z, "HUD_MINI_GAME_SOUNDSET", false, 0, false)
     end)
     
     -- Wait for full animation time
