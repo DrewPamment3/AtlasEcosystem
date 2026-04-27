@@ -391,20 +391,35 @@ end
 RegisterServerEvent('atlas_mining:server:playerLoaded')
 AddEventHandler('atlas_mining:server:playerLoaded', function()
     local _source = source
+    print("^2[PLAYER LOADED]^7 Server received playerLoaded from player " .. _source)
+
     local user = VORPcore.getUser(_source)
-    if not user then return end
+    if not user then
+        print("^1[PLAYER LOADED]^7 No user object for player " .. _source)
+        return
+    end
 
     local character = user.getUsedCharacter
-    if not character then return end
+    if not character then
+        print("^1[PLAYER LOADED]^7 No character for player " .. _source)
+        return
+    end
 
     -- Get player position from player ped (standard RedM approach)
     local ped = GetPlayerPed(_source)
-    if ped == 0 then return end
+    if ped == 0 then
+        print("^1[PLAYER LOADED]^7 No ped for player " .. _source)
+        return
+    end
 
     local playerCoords = GetEntityCoords(ped)
+    print("^2[PLAYER LOADED]^7 Player " .. _source .. " at (" .. string.format("%.1f", playerCoords.x) .. ", " .. string.format("%.1f", playerCoords.y) .. ", " .. string.format("%.1f", playerCoords.z) .. ")")
+    print("^2[PLAYER LOADED]^7 GlobalCamps count: " .. #GlobalCamps .. " GlobalNodes count: " .. #GlobalNodes)
+
     local closestCamps = SubscribePlayerToCamps(_source, playerCoords)
 
     -- Send initial camp state to client (full load with all rocks)
+    print("^2[PLAYER LOADED]^7 Sending loadCamps to player " .. _source .. " with " .. #closestCamps .. " camps and " .. #GlobalNodes .. " nodes")
     TriggerClientEvent('atlas_mining:client:loadCamps', _source, closestCamps, GlobalNodes, CampRockStates)
 end)
 

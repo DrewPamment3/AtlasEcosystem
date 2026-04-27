@@ -7,6 +7,9 @@ local MinedRockMap = {}    -- Map of rockIndex -> depleted rock entity for quick
 local tool = nil
 local hastool = false
 
+-- Startup debug
+print("^2[ATLAS MINING CLIENT]^7 Client script loaded. Waiting 5s before playerLoaded trigger...")
+
 -- [[ UI ]]
 local function DrawMiningPrompt()
     local x, y = 0.5, 0.92
@@ -109,13 +112,16 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
     end
     local modelHash = GetHashKey(modelName)
 
+    print("^3[SPAWN ROCK]^7 Attempting to spawn " .. modelName .. " for camp " .. campId .. " rockIndex " .. rockIndex .. " isDepleted=" .. tostring(isDepleted))
+
     -- Validate model
     if not IsModelValid(modelHash) then
-        print("^1[Atlas Mining]^7 ERROR: Invalid model: " .. modelName)
+        print("^1[SPAWN ROCK]^7 ERROR: Invalid model: " .. modelName .. " (hash: " .. modelHash .. ")")
         return
     end
 
     if not HasModelLoaded(modelHash) then
+        print("^3[SPAWN ROCK]^7 Loading model: " .. modelName)
         RequestModel(modelHash)
         local timeout = GetGameTimer() + AtlasMiningConfig.ModelLoadTimeout
         while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do
@@ -123,19 +129,29 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
         end
 
         if not HasModelLoaded(modelHash) then
-            print("^1[Atlas Mining]^7 Failed to load model " .. modelName .. " within timeout")
+            print("^1[SPAWN ROCK]^7 Failed to load model " .. modelName .. " within timeout")
             return
         end
+        print("^2[SPAWN ROCK]^7 Model loaded: " .. modelName)
     end
 
-    local _, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
+    local foundGround, groundZ = GetGroundZFor_3dCoord(node.x, node.y, 1000.0, 0)
+    if not foundGround then
+        print("^1[SPAWN ROCK]^7 No ground found at (" .. node.x .. ", " .. node.y .. "), using node.z=" .. node.z)
+        groundZ = node.z
+    end
     local zOffset = AtlasMiningConfig.GetRockZOffset(modelName)
-    local rock = CreateObject(modelHash, node.x, node.y, groundZ - zOffset, false, false, false)
+    local spawnZ = groundZ - zOffset
+    print("^3[SPAWN ROCK]^7 Spawning at (" .. string.format("%.1f", node.x) .. ", " .. string.format("%.1f", node.y) .. ", " .. string.format("%.1f", spawnZ) .. ") groundZ=" .. string.format("%.1f", groundZ) .. " zOffset=" .. zOffset)
+
+    local rock = CreateObject(modelHash, node.x, node.y, spawnZ, false, false, false)
 
     if rock == 0 then
-        print("^1[Atlas Mining]^7 ERROR: CreateObject failed for " .. modelName)
+        print("^1[SPAWN ROCK]^7 ERROR: CreateObject returned 0 for " .. modelName)
         return
     end
+
+    print("^2[SPAWN ROCK]^7 Created entity " .. rock .. " for " .. modelName)
 
     SetEntityRotation(rock, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(rock, true)
@@ -148,6 +164,8 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
         entity = rock,
         isDepleted = isDepleted
     })
+
+    print("^2[SPAWN ROCK]^7 CampRegistry now has " .. #CampRegistry .. " entries")
 
     if isDepleted then
         MinedRockMap[rockIndex] = rock
@@ -327,6 +345,19 @@ end)
 
 RegisterNetEvent('atlas_mining:client:loadCamps')
 AddEventHandler('atlas_mining:client:loadCamps', function(camps, nodes, campRockStates)
+    print("^2[LOAD CAMPS]^7 loadCamps received! camps=" .. #camps .. " nodes=" .. #nodes)
+    if #camps > 0 then
+        local campIds = {}
+        for _, c in ipairs(camps) do
+            table.insert(campIds, tostring(c.id))
+        end
+        print("^2[LOAD CAMPS]^7 Camp IDs: " .. table.concat(campIds, ", "))
+    end
+    if #nodes > 0 then
+        local sampleNode = nodes[1]
+        print("^2[LOAD CAMPS]^7 First node: camp_id=" .. tostring(sampleNode.camp_id) .. " model=" .. tostring(sampleNode.model_name) .. " pos=(" .. string.format("%.1f", sampleNode.x) .. ", " .. string.format("%.1f", sampleNode.y) .. ", " .. string.format("%.1f", sampleNode.z) .. ")")
+    end
+
     -- Clear existing registry
     for _, node in ipairs(CampRegistry) do
         if DoesEntityExist(node.entity) then
@@ -359,7 +390,7 @@ AddEventHandler('atlas_mining:client:loadCamps', function(camps, nodes, campRock
         end
     end
 
-    print("^2[Atlas Mining]^7 Loaded " .. #camps .. " camps in render range")
+    print("^2[LOAD CAMPS]^7 Done — CampRegistry has " .. #CampRegistry .. " entries")
 end)
 
 RegisterNetEvent('atlas_mining:client:rockMinedDeath')
