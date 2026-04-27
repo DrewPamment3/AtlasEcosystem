@@ -183,9 +183,9 @@ Citizen.CreateThread(function()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
 
-        -- Start at waist level like woodcutting, but cast forward and slightly downward to hit rocks
-        local start = pCoords + vec3(0, 0, 0.9)
-        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 0.5) -- 2.5m forward, 0.5m up (angled down from waist)
+        -- Start at chest level, cast forward and downward to hit rocks on ground
+        local start = pCoords + vec3(0, 0, 1.3)
+        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 0.3) -- 2.5m forward, 0.3m up (angled down from chest)
 
         -- Always show debug line (you can disable this later by setting DebugLogging to false)
         if AtlasMiningConfig.DebugLogging then
@@ -199,7 +199,8 @@ Citizen.CreateThread(function()
             local entCoords = GetEntityCoords(entityHit)
             local matchedNode = nil
             for _, node in ipairs(CampRegistry) do
-                if #(entCoords - node.coords) < 1.5 and not node.isDepleted then
+                -- Increased tolerance from 1.5 to 3.0 to account for large rock models
+                if #(entCoords - node.coords) < 3.0 and not node.isDepleted then
                     matchedNode = node
                     break
                 end
