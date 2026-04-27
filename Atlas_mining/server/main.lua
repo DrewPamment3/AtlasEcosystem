@@ -202,49 +202,42 @@ end
 
 -- Helper: Award loot to player
 local function AwardLoot(source, oreType, quantity, isBonus)
-    local user = VORPcore.getUser(source)
-    if not user then
-        print("^1[LOOT AWARD]^7 No user found for player " .. source)
-        return false
-    end
-
-    local character = user.getUsedCharacter
-    if not character then
-        print("^1[LOOT AWARD]^7 No character found for player " .. source)
-        return false
-    end
-
     if Config.DebugLogging then
         print("^3[LOOT DEBUG]^7 Attempting to award " .. quantity .. "x " .. oreType .. " to player " .. source)
     end
 
     local success, result = pcall(function()
-        -- Use VORP core inventory system
-        character.addItem(oreType, quantity)
-        return true
+        return exports.vorp_inventory:addItem(source, oreType, quantity)
     end)
 
-    if success and result then
-        -- Get display name for notification
-        local displayName = oreType:gsub("iron_ore_", ""):gsub("_", " ")
-        displayName = displayName:sub(1,1):upper() .. displayName:sub(2) .. " Iron Ore"
-
-        local bonusText = isBonus and " (Bonus)" or ""
-        local quantityText = quantity > 1 and (" x" .. quantity) or ""
-
-        VORPcore.NotifyRightTip(source, "~g~Received: " .. displayName .. quantityText .. bonusText, 3000)
-
-        if Config.DebugLogging then
-            print("^2[LOOT AWARD]^7 SUCCESS: Player " .. source .. " received " .. quantity .. "x " .. oreType .. bonusText)
+    if success then
+        -- Clean display name (remove ore_ prefix and clean up)
+        local displayName = oreType:gsub("_ore_", " "):gsub("_", " ")
+        displayName = displayName:sub(1,1):upper() .. displayName:sub(2) .. " Ore"
+        
+        -- Simple, clean notification format
+        if isBonus then
+            VORPcore.NotifyRightTip(source, "+" .. quantity .. " " .. displayName .. " (Bonus)", 3000)
+        else
+            VORPcore.NotifyRightTip(source, "+" .. quantity .. " " .. displayName, 3000)
         end
-
+        
+        if Config.DebugLogging then
+            local bonusText = isBonus and " (Bonus)" or ""
+            print("^2[LOOT AWARD]^7 Player " .. source .. " received " .. quantity .. "x " .. oreType .. bonusText)
+        end
+        
         return true
     else
         if Config.DebugLogging then
-            print("^1[LOOT AWARD]^7 FAILED to award " .. oreType .. " to player " .. source .. ": " .. tostring(result))
+            print("^1[LOOT AWARD]^7 Failed to award " .. oreType .. " to player " .. source .. ": " .. tostring(result))
         end
-
-        VORPcore.NotifyRightTip(source, "~r~Failed to receive items - check your inventory", 4000)
+        
+        -- Check if it's an inventory full error
+        if tostring(result):find("full") or tostring(result):find("space") then
+            VORPcore.NotifyRightTip(source, "~r~Your inventory is too full to mine", 4000)
+        end
+        
         return false
     end
 end

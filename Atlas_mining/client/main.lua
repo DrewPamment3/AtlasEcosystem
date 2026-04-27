@@ -507,19 +507,19 @@ local function DrawMiningProgressBar()
         end
     end
     
-    -- Background (dark grey)
-    DrawRect(x, y, width, height, 64, 64, 64, 200)
+    -- Background (black)
+    DrawRect(x, y, width, height, 0, 0, 0, 200)
     
-    -- Empty progress sections (light grey)
+    -- Progress sections
     local sectionWidth = width / miningProgress.hitsRequired
     for i = 1, miningProgress.hitsRequired do
         local sectionX = x - (width/2) + (sectionWidth * (i - 0.5))
         if i <= miningProgress.hitsCompleted then
-            -- Completed section (green)
-            DrawRect(sectionX, y, sectionWidth * 0.95, height * 0.9, 0, 255, 0, 255)
-        else
-            -- Uncompleted section (light grey)
+            -- Completed section (grey)
             DrawRect(sectionX, y, sectionWidth * 0.95, height * 0.9, 128, 128, 128, 255)
+        else
+            -- Uncompleted section (transparent/black)
+            DrawRect(sectionX, y, sectionWidth * 0.95, height * 0.9, 32, 32, 32, 255)
         end
     end
     
