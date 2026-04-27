@@ -2,7 +2,12 @@ AtlasMiningConfig = {}
 
 -- Interaction & Rewards
 AtlasMiningConfig.InteractionKey = 0x760A9C6F -- G key (0x760A9C6F)
-AtlasMiningConfig.MineAnimationTime = 5000    -- Milliseconds for mining animation
+AtlasMiningConfig.MineAnimationTime = 5000    -- Milliseconds for mining animation (DEPRECATED - now uses progress system)
+
+-- Progress Bar System (like woodcutting)
+AtlasMiningConfig.MinHitsRequired = 3         -- Minimum hits to mine a rock
+AtlasMiningConfig.MaxHitsRequired = 7         -- Maximum hits to mine a rock
+AtlasMiningConfig.HitAnimationTime = 2500     -- Time for each mining hit animation (ms)
 
 -- Debug Logging (set to false in production)
 AtlasMiningConfig.DebugLogging = true -- Toggle all debug output

@@ -482,17 +482,21 @@ AddEventHandler('atlas_mining:server:requestStart', function(coords, campId, roc
     print("^2[MINE FLOW]^7 requestStart [SERVER] - Player " ..
     _source .. " | Camp " .. campId .. " | Rock " .. rockIndex)
 
+    -- Generate random number of hits required (like woodcutting)
+    local hitsRequired = math.random(Config.MinHitsRequired, Config.MaxHitsRequired)
+    
     local token = "MINE_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
         token = token,
         startTime = os.time(),
         campId = campId,
         rockIndex = rockIndex,
-        nodeData = nodeData
+        nodeData = nodeData,
+        hitsRequired = hitsRequired
     }
-    print("^2[MINE FLOW]^7 Token created: " .. token)
+    print("^2[MINE FLOW]^7 Token created: " .. token .. " | Hits required: " .. hitsRequired)
     print("^2[MINE FLOW]^7 Sending beginMining to client " .. _source)
-    TriggerClientEvent('atlas_mining:client:beginMining', _source, token)
+    TriggerClientEvent('atlas_mining:client:beginMining', _source, token, hitsRequired)
 end)
 
 RegisterServerEvent('atlas_mining:server:finishMine')
@@ -541,6 +545,10 @@ AddEventHandler('atlas_mining:server:finishMine', function(token)
             local bonusText = hasBonusLoot and " (BONUS XP for double loot!)" or ""
             print("^2[MINE FLOW]^7 Successfully awarded " .. xpReward .. " mining XP to player " .. _source .. bonusText)
         end
+        
+        -- Send XP notification to client
+        local bonusText = hasBonusLoot and " (Bonus XP!)" or ""
+        VORPcore.NotifyRightTip(_source, "~b~+" .. xpReward .. " Mining XP" .. bonusText, 4000)
     end
 
     -- Mark rock as depleted

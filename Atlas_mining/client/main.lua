@@ -183,9 +183,9 @@ Citizen.CreateThread(function()
         local pCoords = GetEntityCoords(playerPed)
         local pForward = GetEntityForwardVector(playerPed)
 
-        -- Start at chest level, cast forward and downward to hit rocks on ground
-        local start = pCoords + vec3(0, 0, 1.3)
-        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 0.3) -- 2.5m forward, 0.3m up (angled down from chest)
+        -- Start at waist level, cast forward and downward to hit rocks on ground
+        local start = pCoords + vec3(0, 0, 0.6)
+        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 0.3) -- 2.5m forward, 0.3m up (angled down from waist)
 
         -- Always show debug line (you can disable this later by setting DebugLogging to false)
         if AtlasMiningConfig.DebugLogging then
@@ -480,35 +480,115 @@ AddEventHandler('atlas_mining:client:generateCampNodes', function(cId, center, r
 end)
 
 -- =============================================
--- MINING FLOW (Animation + Timing)
+-- MINING FLOW WITH PROGRESS BAR (like woodcutting)
 -- =============================================
 
+local miningProgress = {
+    active = false,
+    token = nil,
+    hitsRequired = 0,
+    hitsCompleted = 0,
+    animationDelay = AtlasMiningConfig.HitAnimationTime or 2500 -- Time between each hit
+}
+
+local function DrawMiningProgressBar()
+    if not miningProgress.active then return end
+    
+    local progress = miningProgress.hitsCompleted / miningProgress.hitsRequired
+    local x, y = 0.5, 0.85
+    local width, height = 0.25, 0.02
+    
+    -- Background
+    DrawRect(x, y, width, height, 0, 0, 0, 180)
+    
+    -- Progress fill
+    DrawRect(x - (width/2) + (width * progress/2), y, width * progress, height, 0, 255, 0, 255)
+    
+    -- Border
+    DrawRect(x, y, width + 0.002, height + 0.002, 255, 255, 255, 255)
+    DrawRect(x, y, width, height, 0, 0, 0, 0)
+    
+    -- Text
+    SetTextScale(0.35, 0.35)
+    SetTextColor(255, 255, 255, 255)
+    SetTextCentre(true)
+    SetTextFontForCurrentCommand(1)
+    DisplayText(CreateVarString(10, "LITERAL_STRING", 
+        "Mining Progress: " .. miningProgress.hitsCompleted .. "/" .. miningProgress.hitsRequired), x, y - 0.04)
+end
+
+-- Progress bar drawing thread
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        if miningProgress.active then
+            DrawMiningProgressBar()
+        else
+            Citizen.Wait(500)
+        end
+    end
+end)
+
+local function DoMiningHit()
+    local ped = PlayerPedId()
+    
+    -- Play mining swing animation
+    PlayMineSwingAnimation()
+    
+    -- Wait for animation to complete
+    Citizen.Wait(miningProgress.animationDelay)
+    
+    -- Clear animation
+    ClearPedTasks(ped)
+    
+    -- Increment progress
+    miningProgress.hitsCompleted = miningProgress.hitsCompleted + 1
+    
+    print("^2[MINE PROGRESS]^7 Hit " .. miningProgress.hitsCompleted .. "/" .. miningProgress.hitsRequired .. " completed")
+end
+
 RegisterNetEvent('atlas_mining:client:beginMining')
-AddEventHandler('atlas_mining:client:beginMining', function(token)
-    print("^2[MINE FLOW]^7 beginMining [CLIENT] - Token: " .. token)
+AddEventHandler('atlas_mining:client:beginMining', function(token, hitsRequired)
+    print("^2[MINE FLOW]^7 beginMining [CLIENT] - Token: " .. token .. " | Hits required: " .. hitsRequired)
     print("^2[MINE FLOW]^7 Setting isBusy = true")
     isBusy = true
+
+    -- Initialize progress system
+    miningProgress.active = true
+    miningProgress.token = token
+    miningProgress.hitsRequired = hitsRequired or math.random(3, 7) -- Fallback random hits
+    miningProgress.hitsCompleted = 0
 
     -- Equip pickaxe with vorp_mining animation style
     local pickaxeHash = GetHashKey(AtlasMiningConfig.PickaxePropModel)
     EquipPickaxe(pickaxeHash)
 
-    -- Play mining swing animation
-    print("^2[MINE FLOW]^7 Playing mining swing animation: " .. AtlasMiningConfig.MiningAnimDict)
-    PlayMineSwingAnimation()
-
-    print("^2[MINE FLOW]^7 Waiting " .. AtlasMiningConfig.MineAnimationTime .. "ms for animation")
-    Citizen.Wait(AtlasMiningConfig.MineAnimationTime)
-
-    -- Clear tasks and remove pickaxe
-    print("^2[MINE FLOW]^7 Animation complete, clearing tasks and removing pickaxe")
-    ClearPedTasks(PlayerPedId())
-    RemovePickaxeFromPlayer()
-
-    print("^2[MINE FLOW]^7 Setting isBusy = false, sending finishMine to server")
-    isBusy = false
-    TriggerServerEvent('atlas_mining:server:finishMine', token)
-    print("^2[MINE FLOW]^7 finishMine event sent")
+    -- Mining loop with progress
+    Citizen.CreateThread(function()
+        while miningProgress.active and miningProgress.hitsCompleted < miningProgress.hitsRequired do
+            DoMiningHit()
+            
+            -- Small delay between hits
+            if miningProgress.hitsCompleted < miningProgress.hitsRequired then
+                Citizen.Wait(500)
+            end
+        end
+        
+        -- Mining complete
+        if miningProgress.active then
+            print("^2[MINE FLOW]^7 Mining complete! Clearing tasks and removing pickaxe")
+            ClearPedTasks(PlayerPedId())
+            RemovePickaxeFromPlayer()
+            
+            -- Reset progress
+            miningProgress.active = false
+            
+            print("^2[MINE FLOW]^7 Setting isBusy = false, sending finishMine to server")
+            isBusy = false
+            TriggerServerEvent('atlas_mining:server:finishMine', miningProgress.token)
+            print("^2[MINE FLOW]^7 finishMine event sent")
+        end
+    end)
 end)
 
 -- =============================================
