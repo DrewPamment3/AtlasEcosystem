@@ -199,9 +199,8 @@ Citizen.CreateThread(function()
             local targetY = pCoords.y + fwdY * 2.0
             local targetZ = pCoords.z - 0.8  -- below ground level to catch rocks
 
-            if AtlasMiningConfig.DebugLogging then
-                DrawLine(startX, startY, startZ, targetX, targetY, targetZ, 255, 0, 0, 255)
-            end
+            -- ALWAYS draw debug ray so we can tune it
+            DrawLine(startX, startY, startZ, targetX, targetY, targetZ, 255, 0, 0, 255)
 
             local ray = StartShapeTestRay(startX, startY, startZ, targetX, targetY, targetZ, 255, playerPed, 0)
             local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
