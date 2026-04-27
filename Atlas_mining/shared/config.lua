@@ -12,10 +12,10 @@ AtlasMiningConfig.RenderDistance = 400       -- Max distance to render camps (me
 AtlasMiningConfig.RespawnMinutesPerTier = 20 -- Base respawn time (doubled per tier level)
 
 -- Admin Command Validation
-AtlasMiningConfig.RadiusRange = { min = 10, max = 50 }    -- Camp radius meters
-AtlasMiningConfig.RockCountRange = { min = 5, max = 25 }  -- Rocks per camp
-AtlasMiningConfig.TierRange = { min = 1, max = 5 }        -- Camp tier levels
-AtlasMiningConfig.ModelLoadTimeout = 5000                 -- Model load wait time (ms)
+AtlasMiningConfig.RadiusRange = { min = 10, max = 50 }   -- Camp radius meters
+AtlasMiningConfig.RockCountRange = { min = 5, max = 25 } -- Rocks per camp
+AtlasMiningConfig.TierRange = { min = 1, max = 5 }       -- Camp tier levels
+AtlasMiningConfig.ModelLoadTimeout = 5000                -- Model load wait time (ms)
 
 -- ============================================================
 -- ROCK CONFIGURATION
@@ -36,10 +36,10 @@ AtlasMiningConfig.MinedRockModel = "p_int_rock01x"
 -- Rock Model Z-Offsets (subtract from ground Z to sink rocks into terrain)
 -- Use /testspawn [model] [zOffset] to test and find correct values
 AtlasMiningConfig.RockModelZOffsets = {
-    ["roa_int_rock_07"] = 1.5,
-    ["roa_int_rock_05"] = 1.5,
-    ["roa_int_rock_08"] = 1.5,
-    ["roa_int_rock_09"] = 1.5,
+    ["roa_int_rock_07"] = 0.5,
+    ["roa_int_rock_05"] = 0.5,
+    ["roa_int_rock_08"] = 0.5,
+    ["roa_int_rock_09"] = 0.5,
 }
 
 -- Function to get Z offset for a model (returns default 0.0 if not found — rocks need positive Z offset to sink)
@@ -96,11 +96,11 @@ AtlasMiningConfig.TierMultipliers = {
 
 -- Camp unlock levels
 AtlasMiningConfig.CampUnlocks = {
-    [1] = 1,   -- Tier 1 camps at level 1
-    [2] = 20,  -- Tier 2 camps at level 20
-    [3] = 45,  -- Tier 3 camps at level 45
-    [4] = 80,  -- Tier 4 camps at level 80
-    [5] = 95   -- Tier 5 camps at level 95
+    [1] = 1,  -- Tier 1 camps at level 1
+    [2] = 20, -- Tier 2 camps at level 20
+    [3] = 45, -- Tier 3 camps at level 45
+    [4] = 80, -- Tier 4 camps at level 80
+    [5] = 95  -- Tier 5 camps at level 95
 }
 
 -- ============================================================
@@ -110,11 +110,11 @@ AtlasMiningConfig.CampUnlocks = {
 AtlasMiningConfig.LootSystem = {
     -- Base weights for each ore type (starting point before any multipliers)
     baseWeights = {
-        iron_ore_crude = 100,      -- Always abundant
-        iron_ore_common = 20,      -- Starts appearing around level 15
-        iron_ore_rare = 6,         -- Starts appearing around level 35
-        iron_ore_superior = 2,     -- Starts appearing around level 60
-        iron_ore_legendary = 0.5   -- Starts appearing around level 85
+        iron_ore_crude = 100,    -- Always abundant
+        iron_ore_common = 20,    -- Starts appearing around level 15
+        iron_ore_rare = 6,       -- Starts appearing around level 35
+        iron_ore_superior = 2,   -- Starts appearing around level 60
+        iron_ore_legendary = 0.5 -- Starts appearing around level 85
     },
 
     -- Level requirements to start getting each ore type
@@ -128,11 +128,11 @@ AtlasMiningConfig.LootSystem = {
 
     -- Level scaling factors: higher = slower scaling, lower = faster scaling
     levelScaling = {
-        iron_ore_crude = 0,        -- No scaling (always same base weight)
-        iron_ore_common = 30,      -- Reaches 2x base weight at level 45 (15 + 30)
-        iron_ore_rare = 35,        -- Reaches 2x base weight at level 70 (35 + 35)
-        iron_ore_superior = 25,    -- Reaches 2x base weight at level 85 (60 + 25)
-        iron_ore_legendary = 20    -- Reaches 2x base weight at level 105 (85 + 20, caps at 99)
+        iron_ore_crude = 0,     -- No scaling (always same base weight)
+        iron_ore_common = 30,   -- Reaches 2x base weight at level 45 (15 + 30)
+        iron_ore_rare = 35,     -- Reaches 2x base weight at level 70 (35 + 35)
+        iron_ore_superior = 25, -- Reaches 2x base weight at level 85 (60 + 25)
+        iron_ore_legendary = 20 -- Reaches 2x base weight at level 105 (85 + 20, caps at 99)
     },
 
     -- Camp tier effects on each ore type (multipliers)
@@ -182,8 +182,8 @@ AtlasMiningConfig.LootSystem = {
 
         -- Pickaxe bonuses
         pickaxeBonus = {
-            chanceBonus = 4.0,    -- +4% bonus chance per pickaxe tier above 1
-            weightBonus = 0.15    -- +15% weight multiplier to non-crude ores per pickaxe tier above 1
+            chanceBonus = 4.0, -- +4% bonus chance per pickaxe tier above 1
+            weightBonus = 0.15 -- +15% weight multiplier to non-crude ores per pickaxe tier above 1
         }
     }
 }
@@ -207,11 +207,11 @@ AtlasMiningConfig.XPSystem = {
 
     -- Optional: Additional multipliers for different pickaxe tiers
     pickaxeXPMultipliers = {
-        [1] = 1.0,  -- Crude pickaxe: no bonus
-        [2] = 1.1,  -- Fine pickaxe: +10% XP
-        [3] = 1.2,  -- Great pickaxe: +20% XP
-        [4] = 1.3,  -- Superior pickaxe: +30% XP
-        [5] = 1.5   -- Legendary pickaxe: +50% XP
+        [1] = 1.0, -- Crude pickaxe: no bonus
+        [2] = 1.1, -- Fine pickaxe: +10% XP
+        [3] = 1.2, -- Great pickaxe: +20% XP
+        [4] = 1.3, -- Superior pickaxe: +30% XP
+        [5] = 1.5  -- Legendary pickaxe: +50% XP
     }
 }
 
