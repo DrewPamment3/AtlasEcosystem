@@ -37,6 +37,55 @@ AtlasWoodConfig.DebugLogging = true -- Toggle all debug output
 AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
 AtlasWoodConfig.RespawnMinutesPerTier = 20 -- Base respawn time (doubled per tier level)
 
+-- Enhanced Animation System Configuration (VORP Lumberjack Style)
+AtlasWoodConfig.BasicAnimationEnabled = true
+
+-- Multi-tier animation scenarios (priority order for fallback)
+AtlasWoodConfig.Animations = {
+    scenarios = {
+        "WORLD_HUMAN_TREE_CHOP",      -- Primary (most reliable in RedM)
+        "WORLD_HUMAN_GARDENER_PLANT", -- Fallback 1 (digging motion)
+        "WORLD_HUMAN_CROUCH_INSPECT", -- Fallback 2 (basic interaction)
+        "WORLD_HUMAN_STAND_IMPATIENT" -- Final fallback (always works)
+    },
+    
+    -- Interruption detection settings
+    interruption = {
+        maxMovementDistance = 2.5,  -- Max distance before interruption
+        checkInterval = 100,        -- Check frequency (ms)
+        healthCheckEnabled = true,  -- Cancel on damage
+        combatCheckEnabled = true   -- Cancel in combat
+    },
+    
+    -- Visual and audio effects
+    effects = {
+        particlesEnabled = true,
+        woodChipsEffect = "scr_bike_rear_wheels",
+        particleScale = 0.8,
+        particleFrequency = 2000
+    },
+    
+    sounds = {
+        enabled = true,
+        choppingLoop = "ROPE_CUT",
+        completionSound = "CHECKPOINT_PERFECT", 
+        interruptionSound = "CHECKPOINT_MISSED",
+        volume = 0.5
+    },
+    
+    -- Tool-specific animation variations
+    toolAnimations = {
+        ["p_axe01x"] = {
+            speedMultiplier = 1.0,
+            effectsIntensity = 1.0
+        },
+        ["p_axe02x"] = {
+            speedMultiplier = 0.9,  -- 10% faster
+            effectsIntensity = 1.2
+        }
+    }
+}
+
 -- Admin Command Validation
 AtlasWoodConfig.RadiusRange = { min = 10, max = 50 }   -- Forest radius meters
 AtlasWoodConfig.TreeCountRange = { min = 5, max = 25 } -- Trees per forest

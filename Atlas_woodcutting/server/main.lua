@@ -1003,6 +1003,163 @@ RegisterCommand('testxp', function(source, args)
     VORPcore.NotifyRightTip(_source, "~g~XP scaling test complete - check console", 3000)
 end)
 
+-- Admin command to test player animations remotely
+RegisterCommand('testplayeranimation', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    local targetId = tonumber(args[1]) or _source
+    local duration = tonumber(args[2]) or 5000
+    
+    -- Validate target player
+    local targetUser = VORPcore.getUser(targetId)
+    if not targetUser then
+        VORPcore.NotifyRightTip(_source, "~r~Player " .. targetId .. " not found", 4000)
+        return
+    end
+    
+    if duration < 1000 or duration > 30000 then
+        VORPcore.NotifyRightTip(_source, "~r~Duration must be between 1000ms and 30000ms", 4000)
+        return
+    end
+    
+    -- Trigger animation test on target client
+    TriggerClientEvent('atlas_woodcutting:client:adminAnimTest', targetId, duration)
+    
+    VORPcore.NotifyRightTip(_source, "~g~Animation test sent to player " .. targetId .. " for " .. duration .. "ms", 4000)
+    print("^2[ADMIN ANIMATION TEST]^7 Admin " .. _source .. " triggered animation test on player " .. targetId .. " for " .. duration .. "ms")
+end)
+
+-- Admin command to update animation configuration in real-time
+RegisterCommand('updateanimconfig', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    local configKey = args[1]
+    local newValue = tonumber(args[2])
+    
+    if not configKey or not newValue then
+        VORPcore.NotifyRightTip(_source, "~r~Usage: /updateanimconfig [key] [value]", 4000)
+        print("^3[ADMIN CONFIG]^7 Available keys:")
+        print("^7• ChopAnimationTime (1000-30000)")
+        print("^7• maxMovementDistance (1.0-10.0)")
+        print("^7• checkInterval (50-500)")
+        return
+    end
+    
+    -- Update local config
+    if configKey == 'ChopAnimationTime' then
+        if newValue >= 1000 and newValue <= 30000 then
+            AtlasWoodConfig.ChopAnimationTime = newValue
+        else
+            VORPcore.NotifyRightTip(_source, "~r~ChopAnimationTime must be between 1000-30000", 4000)
+            return
+        end
+    elseif configKey == 'maxMovementDistance' then
+        if newValue >= 1.0 and newValue <= 10.0 then
+            AtlasWoodConfig.Animations.interruption.maxMovementDistance = newValue
+        else
+            VORPcore.NotifyRightTip(_source, "~r~maxMovementDistance must be between 1.0-10.0", 4000)
+            return
+        end
+    elseif configKey == 'checkInterval' then
+        if newValue >= 50 and newValue <= 500 then
+            AtlasWoodConfig.Animations.interruption.checkInterval = newValue
+        else
+            VORPcore.NotifyRightTip(_source, "~r~checkInterval must be between 50-500", 4000)
+            return
+        end
+    else
+        VORPcore.NotifyRightTip(_source, "~r~Invalid config key", 4000)
+        return
+    end
+    
+    -- Broadcast update to all clients
+    TriggerClientEvent('atlas_woodcutting:client:updateConfig', -1, configKey, newValue)
+    
+    VORPcore.NotifyRightTip(_source, "~g~Updated " .. configKey .. " = " .. newValue, 4000)
+    print("^2[ADMIN CONFIG]^7 Admin " .. _source .. " updated " .. configKey .. " to " .. newValue)
+end)
+
+-- Admin command to get current animation system status
+RegisterCommand('animationstatus', function(source, args)
+    local _source = source
+    if _source == 0 then
+        print("^3[Atlas Woodcutting]^7 Use this command in-game")
+        return
+    end
+
+    local user = VORPcore.getUser(_source)
+    if not user then
+        VORPcore.NotifyRightTip(_source, "~r~Error loading user data", 4000)
+        return
+    end
+
+    local character = user.getUsedCharacter
+    local charGroup = character and character.group or "user"
+    if charGroup ~= 'admin' and charGroup ~= 'superadmin' then
+        VORPcore.NotifyRightTip(_source, "~r~Admin only command", 4000)
+        return
+    end
+
+    print("^2[ANIMATION STATUS]^7 Current Animation System Configuration:")
+    print("^2=======================================================^7")
+    print("^3Animation Settings:^7")
+    print("^7• ChopAnimationTime: " .. AtlasWoodConfig.ChopAnimationTime .. "ms")
+    print("^7• Available Scenarios: " .. #AtlasWoodConfig.Animations.scenarios)
+    for i, scenario in ipairs(AtlasWoodConfig.Animations.scenarios) do
+        print("^7  " .. i .. ". " .. scenario)
+    end
+    
+    print("^3Interruption Settings:^7")
+    print("^7• Max Movement Distance: " .. AtlasWoodConfig.Animations.interruption.maxMovementDistance .. "m")
+    print("^7• Check Interval: " .. AtlasWoodConfig.Animations.interruption.checkInterval .. "ms")
+    print("^7• Health Check: " .. tostring(AtlasWoodConfig.Animations.interruption.healthCheckEnabled))
+    print("^7• Combat Check: " .. tostring(AtlasWoodConfig.Animations.interruption.combatCheckEnabled))
+    
+    print("^3Effects Settings:^7")
+    print("^7• Sounds Enabled: " .. tostring(AtlasWoodConfig.Animations.sounds.enabled))
+    print("^7• Particles Enabled: " .. tostring(AtlasWoodConfig.Animations.effects.particlesEnabled))
+    print("^7• Sound Volume: " .. AtlasWoodConfig.Animations.sounds.volume)
+    print("^7• Particle Scale: " .. AtlasWoodConfig.Animations.effects.particleScale)
+    
+    print("^2=======================================================^7")
+    
+    VORPcore.NotifyRightTip(_source, "~g~Animation status logged to console", 3000)
+end)
+
 RegisterCommand('listforests', function(source, args)
     local _source = source
     if _source == 0 then
