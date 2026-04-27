@@ -153,7 +153,7 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
 
     print("^2[SPAWN ROCK]^7 Created entity " .. rock .. " for " .. modelName)
 
-    SetEntityRotation(rock, 0.0, 0.0, 0.0, 2, true)
+    SetEntityRotation(rock, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
     FreezeEntityPosition(rock, true)
     SetEntityAsMissionEntity(rock, true, true)
 
@@ -176,60 +176,48 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
 end
 
 -- [[ INTERACTION LOOP ]]
--- Raycast diagonal downward to hit rocks, runs every 250ms when not busy
 Citizen.CreateThread(function()
     while true do
-        if isBusy then
-            Citizen.Wait(500)
-        else
-            local playerPed = PlayerPedId()
-            local pCoords = GetEntityCoords(playerPed)
-            local heading = GetEntityHeading(playerPed)
+        Citizen.Wait(0)
+        local playerPed = PlayerPedId()
+        local pCoords = GetEntityCoords(playerPed)
+        local pForward = GetEntityForwardVector(playerPed)
 
-            -- Forward vector
-            local fwdX = math.sin(math.rad(heading))
-            local fwdY = -math.cos(math.rad(heading))
+        -- Start at waist level like woodcutting, but cast forward and slightly downward to hit rocks
+        local start = pCoords + vec3(0, 0, 0.9)
+        local target = pCoords + (pForward * 2.5) + vec3(0, 0, 0.5) -- 2.5m forward, 0.5m up (angled down from waist)
 
-            -- Start from head/chest height, cast diagonally forward and downward at ~45°
-            local startX = pCoords.x + fwdX * 0.5
-            local startY = pCoords.y + fwdY * 0.5
-            local startZ = pCoords.z + 1.2   -- eye level
+        -- Always show debug line (you can disable this later by setting DebugLogging to false)
+        if AtlasMiningConfig.DebugLogging then
+            DrawLine(start.x, start.y, start.z, target.x, target.y, target.z, 255, 0, 0, 255)
+        end
 
-            local targetX = pCoords.x + fwdX * 2.0
-            local targetY = pCoords.y + fwdY * 2.0
-            local targetZ = pCoords.z - 0.8  -- below ground level to catch rocks
+        local ray = StartShapeTestRay(start.x, start.y, start.z, target.x, target.y, target.z, 255, playerPed, 0)
+        local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
 
-            -- ALWAYS draw debug ray so we can tune it
-            DrawLine(startX, startY, startZ, targetX, targetY, targetZ, 255, 0, 0, 255)
-
-            local ray = StartShapeTestRay(startX, startY, startZ, targetX, targetY, targetZ, 255, playerPed, 0)
-            local _, hit, _, _, entityHit, _ = GetShapeTestResult(ray)
-
-            if hit == 1 and entityHit ~= 0 then
-                local matchedNode = nil
-                for _, node in ipairs(CampRegistry) do
-                    if node.entity == entityHit and not node.isDepleted then
-                        matchedNode = node
-                        break
-                    end
-                end
-
-                if matchedNode then
-                    DrawMiningPrompt()
-                    if IsControlJustPressed(0, AtlasMiningConfig.InteractionKey) then
-                        print("^2[Mine Debug]^7 SUCCESS: Interaction for Camp " ..
-                            matchedNode.campId .. " | Rock " .. matchedNode.rockIndex)
-                        TriggerServerEvent('atlas_mining:server:requestStart', nil, matchedNode.campId,
-                            matchedNode.rockIndex, {
-                                x = matchedNode.coords.x,
-                                y = matchedNode.coords.y,
-                                z = matchedNode.coords.z
-                            })
-                    end
+        if hit == 1 and entityHit ~= 0 then
+            local entCoords = GetEntityCoords(entityHit)
+            local matchedNode = nil
+            for _, node in ipairs(CampRegistry) do
+                if #(entCoords - node.coords) < 1.5 and not node.isDepleted then
+                    matchedNode = node
+                    break
                 end
             end
 
-            Citizen.Wait(250) -- Check every 250ms when not busy
+            if matchedNode then
+                DrawMiningPrompt()
+                if IsControlJustPressed(0, AtlasMiningConfig.InteractionKey) and not isBusy then
+                    print("^2[Mine Debug]^7 SUCCESS: Interaction for Camp " ..
+                        matchedNode.campId .. " | Rock " .. matchedNode.rockIndex)
+                    TriggerServerEvent('atlas_mining:server:requestStart', entCoords, matchedNode.campId,
+                        matchedNode.rockIndex, {
+                            x = matchedNode.coords.x,
+                            y = matchedNode.coords.y,
+                            z = matchedNode.coords.z
+                        })
+                end
+            end
         end
     end
 end)
