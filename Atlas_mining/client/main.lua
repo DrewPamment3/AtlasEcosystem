@@ -153,7 +153,7 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
 
     print("^2[SPAWN ROCK]^7 Created entity " .. rock .. " for " .. modelName)
 
-    SetEntityRotation(rock, 0.0, 0.0, math.random(0, 360) + 0.0, 2, true)
+    SetEntityRotation(rock, 0.0, 0.0, 0.0, 2, true)
     FreezeEntityPosition(rock, true)
     SetEntityAsMissionEntity(rock, true, true)
 
