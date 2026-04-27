@@ -31,7 +31,7 @@ AtlasWoodConfig.XPSystem = {
 }
 
 -- Debug Logging (set to false in production)
-AtlasWoodConfig.DebugLogging = true -- Toggle all debug output
+AtlasWoodConfig.DebugLogging = false -- Toggle all debug output
 
 -- Distance & Rendering
 AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
