@@ -433,8 +433,8 @@ end)
 
 RegisterServerEvent('atlas_mining:server:saveNode')
 AddEventHandler('atlas_mining:server:saveNode', function(campId, coords, modelName)
-    -- Server picks the model if not specified (ensures all players see the same rock)
-    if not modelName then
+    -- Server picks the model if not specified or empty (ensures all players see the same rock)
+    if not modelName or modelName == "" then
         local rocks = Config.Rocks
         modelName = rocks[math.random(1, #rocks)]
     end

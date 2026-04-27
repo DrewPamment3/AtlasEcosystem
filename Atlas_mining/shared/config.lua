@@ -36,10 +36,10 @@ AtlasMiningConfig.MinedRockModel = "p_int_rock01x"
 -- Rock Model Z-Offsets (subtract from ground Z to sink rocks into terrain)
 -- Use /testspawn [model] [zOffset] to test and find correct values
 AtlasMiningConfig.RockModelZOffsets = {
-    ["roa_int_rock_07"] = 0.5,
-    ["roa_int_rock_05"] = 0.5,
-    ["roa_int_rock_08"] = 0.5,
-    ["roa_int_rock_09"] = 0.5,
+    ["roa_int_rock_07"] = 0.3,
+    ["roa_int_rock_05"] = 0.3,
+    ["roa_int_rock_08"] = 0.3,
+    ["roa_int_rock_09"] = 0.3,
 }
 
 -- Function to get Z offset for a model (returns default 0.0 if not found — rocks need positive Z offset to sink)
