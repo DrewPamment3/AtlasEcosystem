@@ -1,5 +1,13 @@
+print("^5======================================^7")
+print("^5  ATLAS MINING SERVER BOOTING^7")
+print("^5======================================^7")
+
 local VORPcore = exports.vorp_core:GetCore()
+print("^2[ATLAS MINING]^7 VORP core loaded")
+
 local Config = AtlasMiningConfig -- Reference shared config
+print("^2[ATLAS MINING]^7 Config loaded. Rocks configured: " .. #Config.Rocks)
+
 local ActiveTasks = {}
 local GlobalCamps = {}
 local GlobalNodes = {}
