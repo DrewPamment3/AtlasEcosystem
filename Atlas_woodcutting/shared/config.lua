@@ -11,27 +11,27 @@ AtlasWoodConfig.XPSystem = {
     -- Base XP rewards by grove tier (doubles each tier)
     baseTierXP = {
         [1] = 150,  -- Tier 1 groves: 150 XP
-        [2] = 300,  -- Tier 2 groves: 300 XP  
+        [2] = 300,  -- Tier 2 groves: 300 XP
         [3] = 600,  -- Tier 3 groves: 600 XP
         [4] = 1200, -- Tier 4 groves: 1200 XP
         [5] = 2400  -- Tier 5 groves: 2400 XP
     },
-    
+
     -- Bonus XP multiplier when player gets bonus loot (double wood)
     bonusLootXPMultiplier = 2.0, -- Double XP when bonus loot triggers
-    
+
     -- Optional: Additional multipliers for different axe tiers
     axeXPMultipliers = {
-        [1] = 1.0,  -- Crude axe: no bonus
-        [2] = 1.1,  -- Fine axe: +10% XP
-        [3] = 1.2,  -- Great axe: +20% XP  
-        [4] = 1.3,  -- Superior axe: +30% XP
-        [5] = 1.5   -- Legendary axe: +50% XP
+        [1] = 1.0, -- Crude axe: no bonus
+        [2] = 1.1, -- Fine axe: +10% XP
+        [3] = 1.2, -- Great axe: +20% XP
+        [4] = 1.3, -- Superior axe: +30% XP
+        [5] = 1.5  -- Legendary axe: +50% XP
     }
 }
 
 -- Debug Logging (set to false in production)
-AtlasWoodConfig.DebugLogging = true -- Toggle all debug output
+AtlasWoodConfig.DebugLogging = false -- Toggle all debug output
 
 -- Distance & Rendering
 AtlasWoodConfig.RenderDistance = 400       -- Max distance to render forests (meters)
@@ -63,24 +63,24 @@ AtlasWoodConfig.TierMultipliers = {
 
 -- Grove unlock levels
 AtlasWoodConfig.GroveUnlocks = {
-    [1] = 1,   -- Tier 1 groves at level 1
-    [2] = 20,  -- Tier 2 groves at level 20
-    [3] = 45,  -- Tier 3 groves at level 45
-    [4] = 80,  -- Tier 4 groves at level 80
-    [5] = 95   -- Tier 5 groves at level 95
+    [1] = 1,  -- Tier 1 groves at level 1
+    [2] = 20, -- Tier 2 groves at level 20
+    [3] = 45, -- Tier 3 groves at level 45
+    [4] = 80, -- Tier 4 groves at level 80
+    [5] = 95  -- Tier 5 groves at level 95
 }
 
 -- Comprehensive loot system configuration
 AtlasWoodConfig.LootSystem = {
     -- Base weights for each wood type (starting point before any multipliers)
     baseWeights = {
-        wood_crude = 100,      -- Always abundant
-        wood_common = 20,      -- Starts appearing around level 15
-        wood_rare = 6,         -- Starts appearing around level 35
-        wood_superior = 2,     -- Starts appearing around level 60
-        wood_legendary = 0.5   -- Starts appearing around level 85
+        wood_crude = 100,    -- Always abundant
+        wood_common = 20,    -- Starts appearing around level 15
+        wood_rare = 6,       -- Starts appearing around level 35
+        wood_superior = 2,   -- Starts appearing around level 60
+        wood_legendary = 0.5 -- Starts appearing around level 85
     },
-    
+
     -- Level requirements to start getting each wood type
     levelRequirements = {
         wood_crude = 1,
@@ -89,16 +89,16 @@ AtlasWoodConfig.LootSystem = {
         wood_superior = 60,
         wood_legendary = 85
     },
-    
+
     -- Level scaling factors: higher = slower scaling, lower = faster scaling
     levelScaling = {
-        wood_crude = 0,        -- No scaling (always same base weight)
-        wood_common = 30,      -- Reaches 2x base weight at level 45 (15 + 30)
-        wood_rare = 35,        -- Reaches 2x base weight at level 70 (35 + 35)
-        wood_superior = 25,    -- Reaches 2x base weight at level 85 (60 + 25)
-        wood_legendary = 20    -- Reaches 2x base weight at level 105 (85 + 20, caps at 99)
+        wood_crude = 0,     -- No scaling (always same base weight)
+        wood_common = 30,   -- Reaches 2x base weight at level 45 (15 + 30)
+        wood_rare = 35,     -- Reaches 2x base weight at level 70 (35 + 35)
+        wood_superior = 25, -- Reaches 2x base weight at level 85 (60 + 25)
+        wood_legendary = 20 -- Reaches 2x base weight at level 105 (85 + 20, caps at 99)
     },
-    
+
     -- Grove tier effects on each wood type (multipliers)
     groveEffects = {
         [1] = { -- Tier 1: Heavily favors crude
@@ -137,17 +137,17 @@ AtlasWoodConfig.LootSystem = {
             wood_legendary = 3.0
         }
     },
-    
+
     -- Bonus loot system (second roll chance)
     bonusLoot = {
         baseChance = 12.0,     -- Base 12% chance for bonus loot
         levelBonus = 0.15,     -- +0.15% per woodcutting level (15% at level 100)
         maxBonusChance = 35.0, -- Cap at 35% total chance
-        
+
         -- Axe bonuses
         axeBonus = {
-            chanceBonus = 4.0,    -- +4% bonus chance per axe tier above 1
-            weightBonus = 0.15    -- +15% weight multiplier to non-crude woods per axe tier above 1
+            chanceBonus = 4.0, -- +4% bonus chance per axe tier above 1
+            weightBonus = 0.15 -- +15% weight multiplier to non-crude woods per axe tier above 1
         }
     }
 }
@@ -204,105 +204,105 @@ function AtlasWoodConfig.CalculateLootWeights(playerLevel, groveTier, axeTier, i
     local loot = AtlasWoodConfig.LootSystem
     local weights = {}
     local totalWeight = 0
-    
+
     -- Validate grove access
     local requiredLevel = AtlasWoodConfig.GroveUnlocks[groveTier]
     if requiredLevel and playerLevel < requiredLevel then
         return nil, requiredLevel -- Return required level for error message
     end
-    
+
     -- Calculate weights for each wood type
     for woodType, baseWeight in pairs(loot.baseWeights) do
         local minLevel = loot.levelRequirements[woodType]
-        
+
         -- Skip if player doesn't meet level requirement
         if playerLevel >= minLevel then
             -- Base weight calculation with level scaling
             local weight = baseWeight
             local scalingFactor = loot.levelScaling[woodType]
-            
+
             if scalingFactor > 0 and playerLevel > minLevel then
                 local levelBonus = (playerLevel - minLevel) / scalingFactor
                 weight = baseWeight * (1 + levelBonus)
             end
-            
+
             -- Apply grove tier effects
             local groveEffect = loot.groveEffects[groveTier] and loot.groveEffects[groveTier][woodType] or 1.0
             weight = weight * groveEffect
-            
+
             -- Apply axe bonuses for higher-tier woods (not crude)
             if axeTier > 1 and woodType ~= "wood_crude" then
                 local axeMultiplier = 1 + ((axeTier - 1) * loot.bonusLoot.axeBonus.weightBonus)
                 weight = weight * axeMultiplier
             end
-            
+
             -- For bonus loot, slightly reduce crude weight to make it more interesting
             if isBonus and woodType == "wood_crude" then
                 weight = weight * 0.7
             end
-            
+
             weights[woodType] = weight
             totalWeight = totalWeight + weight
         end
     end
-    
+
     return weights, totalWeight
 end
 
 function AtlasWoodConfig.RollForLoot(weights, totalWeight)
     if totalWeight <= 0 then return nil end
-    
+
     local roll = math.random() * totalWeight
     local currentWeight = 0
-    
+
     for woodType, weight in pairs(weights) do
         currentWeight = currentWeight + weight
         if roll <= currentWeight then
             return woodType
         end
     end
-    
+
     -- Fallback to first available wood type
     for woodType, _ in pairs(weights) do
         return woodType
     end
-    
+
     return nil
 end
 
 function AtlasWoodConfig.CalculateBonusChance(playerLevel, axeTier)
     local bonusConfig = AtlasWoodConfig.LootSystem.bonusLoot
-    
+
     -- Base chance + level bonus
     local chance = bonusConfig.baseChance + (playerLevel * bonusConfig.levelBonus)
-    
+
     -- Axe tier bonus
     if axeTier > 1 then
         chance = chance + ((axeTier - 1) * bonusConfig.axeBonus.chanceBonus)
     end
-    
+
     -- Cap at maximum
     chance = math.min(chance, bonusConfig.maxBonusChance)
-    
+
     return chance
 end
 
 -- Calculate XP reward based on grove tier, axe tier, and whether bonus loot was awarded
 function AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, hasBonusLoot)
     local xpConfig = AtlasWoodConfig.XPSystem
-    
+
     -- Get base XP for this grove tier
     local baseXP = xpConfig.baseTierXP[groveTier] or xpConfig.baseTierXP[1]
-    
+
     -- Apply axe multiplier
     local axeMultiplier = xpConfig.axeXPMultipliers[axeTier] or 1.0
     local xpAmount = baseXP * axeMultiplier
-    
+
     -- Apply bonus loot multiplier if player got bonus loot
     if hasBonusLoot then
         xpAmount = xpAmount * xpConfig.bonusLootXPMultiplier
     end
-    
+
     -- Round to nearest integer
     return math.floor(xpAmount + 0.5)
 end
@@ -316,7 +316,7 @@ end
 -- Validation function
 function AtlasWoodConfig.ValidateLootSystem()
     local errors = {}
-    
+
     -- Check that all wood types have required config
     for woodType, _ in pairs(AtlasWoodConfig.LootSystem.baseWeights) do
         if not AtlasWoodConfig.LootSystem.levelRequirements[woodType] then
@@ -326,20 +326,20 @@ function AtlasWoodConfig.ValidateLootSystem()
             table.insert(errors, "Missing level scaling for " .. woodType)
         end
     end
-    
+
     -- Check grove effects
     for tier = 1, 5 do
         if not AtlasWoodConfig.LootSystem.groveEffects[tier] then
             table.insert(errors, "Missing grove effects for tier " .. tier)
         end
     end
-    
+
     if #errors > 0 then
         for _, error in ipairs(errors) do
             print("^1[Atlas Woodcutting Config Error]^7 " .. error)
         end
         return false
     end
-    
+
     return true
 end
