@@ -443,6 +443,7 @@ AddEventHandler('atlas_mining:client:spawnSingleNode', function(node, campId)
 end)
 
 -- Generate camp nodes (called after /createcamp)
+-- Client picks random positions, server picks the actual model to keep everything synced
 RegisterNetEvent('atlas_mining:client:generateCampNodes')
 AddEventHandler('atlas_mining:client:generateCampNodes', function(cId, center, radius, count, model)
     for i = 1, count do
@@ -451,6 +452,7 @@ AddEventHandler('atlas_mining:client:generateCampNodes', function(cId, center, r
         local y = center.y + r * math.sin(angle)
         local foundGround, groundZ = GetGroundZFor_3dCoord(x, y, 1000.0, 0)
         if foundGround then
+            -- Pass model (nil = server picks random from Config.Rocks)
             TriggerServerEvent('atlas_mining:server:saveNode', cId, vec3(x, y, groundZ), model)
         end
         Citizen.Wait(300)

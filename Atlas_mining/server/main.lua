@@ -433,6 +433,12 @@ end)
 
 RegisterServerEvent('atlas_mining:server:saveNode')
 AddEventHandler('atlas_mining:server:saveNode', function(campId, coords, modelName)
+    -- Server picks the model if not specified (ensures all players see the same rock)
+    if not modelName then
+        local rocks = Config.Rocks
+        modelName = rocks[math.random(1, #rocks)]
+    end
+
     exports.oxmysql:insert('INSERT INTO atlas_mining_nodes (camp_id, x, y, z, model_name) VALUES (?, ?, ?, ?, ?)',
         { campId, coords.x, coords.y, coords.z, modelName }, function(id)
             if id then
@@ -586,7 +592,8 @@ RegisterCommand('createcamp', function(source, args)
 
     local pCoords = GetEntityCoords(GetPlayerPed(_source))
     local radius, count, tier = tonumber(args[1]) or 15.0, tonumber(args[2]) or 10, tonumber(args[3]) or 1
-    local model, name = args[4] or "p_rock_basalt_01", args[5] or "Unnamed_Camp"
+    local model = args[4] or nil  -- nil = random mixture from Config.Rocks
+    local name = args[5] or "Unnamed_Camp"
 
     -- Validate parameters against config ranges
     if radius < Config.RadiusRange.min or radius > Config.RadiusRange.max then
@@ -604,9 +611,10 @@ RegisterCommand('createcamp', function(source, args)
         return
     end
 
+    local dbModel = model or "mixed"  -- "mixed" = random rocks from Config.Rocks
     exports.oxmysql:insert(
         'INSERT INTO atlas_mining_camps (x, y, z, radius, rock_count, tier, model_name, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, model, name }, function(cId)
+        { pCoords.x, pCoords.y, pCoords.z, radius, count, tier, dbModel, name }, function(cId)
             if cId then
                 -- Success: Update GlobalCamps immediately
                 RefreshGlobalCamps(function()

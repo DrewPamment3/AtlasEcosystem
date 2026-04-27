@@ -18,30 +18,39 @@ AtlasMiningConfig.TierRange = { min = 1, max = 5 }        -- Camp tier levels
 AtlasMiningConfig.ModelLoadTimeout = 5000                 -- Model load wait time (ms)
 
 -- ============================================================
--- ROCK CONFIGURATION (Empty - fill in after testing)
+-- ROCK CONFIGURATION
 -- ============================================================
 
--- Rock models that can be mined (model names as game references)
--- Use /testspawn <model> in-game to test rock models, then add them here
+-- Rock models that can be mined (mixed randomly within each camp)
+-- Use /testspawn <model> in-game to test rock models
 AtlasMiningConfig.Rocks = {
-    -- "p_rock_basalt_01",
-    -- "p_rock_granite_03",
-    -- "p_rock_sandstone_calm_01",
+    "roa_int_rock_07",
+    "roa_int_rock_05",
+    "roa_int_rock_08",
+    "roa_int_rock_09",
 }
 
 -- Mined rock model (appears after rock is depleted, replaces the original)
-AtlasMiningConfig.MinedRockModel = "p_stump" -- Placeholder, set to a rubble/rock debris model later
+AtlasMiningConfig.MinedRockModel = "p_int_rock01x"
 
--- Rock Model Z-Offsets (subtract from ground Z to properly position rocks)
+-- Rock Model Z-Offsets (subtract from ground Z to sink rocks into terrain)
 -- Use /testspawn [model] [zOffset] to test and find correct values
 AtlasMiningConfig.RockModelZOffsets = {
-    -- ADD AFTER TESTING, example:
-    -- ["p_rock_basalt_01"] = 0.5,
+    ["roa_int_rock_07"] = 1.5,
+    ["roa_int_rock_05"] = 1.5,
+    ["roa_int_rock_08"] = 1.5,
+    ["roa_int_rock_09"] = 1.5,
 }
 
--- Function to get Z offset for a model (returns default 0.2 if not found)
+-- Function to get Z offset for a model (returns default 0.0 if not found — rocks need positive Z offset to sink)
 function AtlasMiningConfig.GetRockZOffset(modelName)
-    return AtlasMiningConfig.RockModelZOffsets[modelName] or 0.2
+    return AtlasMiningConfig.RockModelZOffsets[modelName] or 0.0
+end
+
+-- Helper: Pick a random rock model from the config list
+function AtlasMiningConfig.GetRandomRockModel()
+    local rocks = AtlasMiningConfig.Rocks
+    return rocks[math.random(1, #rocks)]
 end
 
 -- ============================================================
