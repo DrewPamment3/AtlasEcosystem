@@ -498,15 +498,20 @@ local function DrawMiningProgressBar()
     local x, y = 0.5, 0.85
     local width, height = 0.25, 0.02
     
-    -- Background
-    DrawRect(x, y, width, height, 0, 0, 0, 180)
+    -- Background (dark grey)
+    DrawRect(x, y, width, height, 64, 64, 64, 200)
     
-    -- Progress fill
-    DrawRect(x - (width/2) + (width * progress/2), y, width * progress, height, 0, 255, 0, 255)
+    -- Progress fill (green) - only show if there's progress
+    if progress > 0 then
+        local fillWidth = width * progress
+        DrawRect(x - (width/2) + (fillWidth/2), y, fillWidth, height, 0, 255, 0, 255)
+    end
     
-    -- Border
-    DrawRect(x, y, width + 0.002, height + 0.002, 255, 255, 255, 255)
-    DrawRect(x, y, width, height, 0, 0, 0, 0)
+    -- Border (white)
+    DrawRect(x, y - height/2 - 0.001, width + 0.004, 0.002, 255, 255, 255, 255) -- Top
+    DrawRect(x, y + height/2 + 0.001, width + 0.004, 0.002, 255, 255, 255, 255) -- Bottom
+    DrawRect(x - width/2 - 0.002, y, 0.002, height + 0.004, 255, 255, 255, 255) -- Left
+    DrawRect(x + width/2 + 0.002, y, 0.002, height + 0.004, 255, 255, 255, 255) -- Right
     
     -- Text
     SetTextScale(0.35, 0.35)
@@ -535,8 +540,16 @@ local function DoMiningHit()
     -- Play mining swing animation
     PlayMineSwingAnimation()
     
-    -- Wait for animation to complete
-    Citizen.Wait(miningProgress.animationDelay)
+    -- Wait 80% through the animation, then play sound
+    Citizen.Wait(math.floor(miningProgress.animationDelay * 0.8))
+    
+    -- Play mining sound effect (pickaxe hitting rock)
+    local coords = GetEntityCoords(ped)
+    -- Using a generic "rock hit" sound from RDR2's audio system
+    Citizen.InvokeNative(0x67C540AA08E4A6F5, "Core_Hunting_Ore_Hit_Successful_01", coords.x, coords.y, coords.z, "HUD_SHOP_SOUNDSET", false, 0, false)
+    
+    -- Wait for remaining animation time
+    Citizen.Wait(math.floor(miningProgress.animationDelay * 0.2))
     
     -- Clear animation
     ClearPedTasks(ped)

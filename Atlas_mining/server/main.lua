@@ -202,11 +202,25 @@ end
 
 -- Helper: Award loot to player
 local function AwardLoot(source, oreType, quantity, isBonus)
+    local user = VORPcore.getUser(source)
+    if not user then
+        print("^1[LOOT AWARD]^7 No user found for player " .. source)
+        return false
+    end
+
+    local character = user.getUsedCharacter
+    if not character then
+        print("^1[LOOT AWARD]^7 No character found for player " .. source)
+        return false
+    end
+
     local success, result = pcall(function()
-        return exports.vorp_inventory:addItem(source, oreType, quantity)
+        -- Use VORP core inventory system
+        character.addItem(oreType, quantity)
+        return true
     end)
 
-    if success then
+    if success and result then
         -- Get display name for notification
         local displayName = oreType:gsub("iron_ore_", ""):gsub("_", " ")
         displayName = displayName:sub(1,1):upper() .. displayName:sub(2) .. " Iron Ore"
@@ -226,11 +240,7 @@ local function AwardLoot(source, oreType, quantity, isBonus)
             print("^1[LOOT AWARD]^7 Failed to award " .. oreType .. " to player " .. source .. ": " .. tostring(result))
         end
 
-        -- Check if it's an inventory full error
-        if tostring(result):find("full") or tostring(result):find("space") then
-            VORPcore.NotifyRightTip(source, "~r~Your inventory is too full to harvest", 4000)
-        end
-
+        VORPcore.NotifyRightTip(source, "~r~Failed to receive items - check your inventory", 4000)
         return false
     end
 end
