@@ -41,10 +41,10 @@ AtlasMiningConfig.MinedRockModel = "p_int_rock01x"
 -- Rock Model Z-Offsets (subtract from ground Z to sink rocks into terrain)
 -- Use /testspawn [model] [zOffset] to test and find correct values
 AtlasMiningConfig.RockModelZOffsets = {
-    ["roa_int_rock_07"] = 0.3,
-    ["roa_int_rock_05"] = 0.3,
-    ["roa_int_rock_08"] = 0.3,
-    ["roa_int_rock_09"] = 0.3,
+    ["roa_int_rock_07"] = 1.3,
+    ["roa_int_rock_05"] = 1.3,
+    ["roa_int_rock_08"] = 1.3,
+    ["roa_int_rock_09"] = 1.3,
 }
 
 -- Function to get Z offset for a model (returns default 0.0 if not found — rocks need positive Z offset to sink)
@@ -59,33 +59,33 @@ function AtlasMiningConfig.GetRandomRockModel()
 end
 
 -- ============================================================
--- PICKAXE CONFIGURATION (Tier 1-5)
+-- PICKAXE CONFIGURATION (Tier 1-5) - Updated to match DB
 -- ============================================================
 
 AtlasMiningConfig.Pickaxes = {
-    ["crude_pickaxe"]     = { tier = 1, power = 1.0 },
-    ["fine_pickaxe"]      = { tier = 2, power = 1.2 },
-    ["great_pickaxe"]     = { tier = 3, power = 1.5 },
-    ["superior_pickaxe"]  = { tier = 4, power = 2.0 },
-    ["legendary_pickaxe"] = { tier = 5, power = 3.0 }
+    ["pickaxe_crude"]     = { tier = 1, power = 1.0 },
+    ["pickaxe_common"]    = { tier = 2, power = 1.2 },
+    ["pickaxe_great"]     = { tier = 3, power = 1.5 },
+    ["pickaxe_superior"]  = { tier = 4, power = 2.0 },
+    ["pickaxe_legendary"] = { tier = 5, power = 3.0 }
 }
 
 AtlasMiningConfig.PickaxeUnlocks = {
-    ["crude_pickaxe"] = 1,
-    ["fine_pickaxe"] = 20,
-    ["great_pickaxe"] = 45,
-    ["superior_pickaxe"] = 70,
-    ["legendary_pickaxe"] = 90
+    ["pickaxe_crude"] = 1,
+    ["pickaxe_common"] = 20,
+    ["pickaxe_great"] = 45,
+    ["pickaxe_superior"] = 70,
+    ["pickaxe_legendary"] = 90
 }
 
 -- ============================================================
--- ORE CONFIGURATION (All Iron-based tiers)
+-- ORE CONFIGURATION (All Iron-based tiers) - Updated to match DB
 -- ============================================================
 
 AtlasMiningConfig.OreTiers = {
     { id = 1, name = "iron_ore_crude",     minLevel = 1,  baseWeight = 100, weightMultiplier = 1.0 },
     { id = 2, name = "iron_ore_common",    minLevel = 1,  baseWeight = 5,   weightMultiplier = 1.5 },
-    { id = 3, name = "iron_ore_rare",      minLevel = 20, baseWeight = 2,   weightMultiplier = 2.0 },
+    { id = 3, name = "iron_ore_great",     minLevel = 20, baseWeight = 2,   weightMultiplier = 2.0 },
     { id = 4, name = "iron_ore_superior",  minLevel = 45, baseWeight = 1,   weightMultiplier = 3.0 },
     { id = 5, name = "iron_ore_legendary", minLevel = 70, baseWeight = 0.5, weightMultiplier = 5.0, reqPickaxeTier = 4 }
 }
@@ -109,7 +109,7 @@ AtlasMiningConfig.CampUnlocks = {
 }
 
 -- ============================================================
--- LOOT SYSTEM (Same math as woodcutting)
+-- LOOT SYSTEM (Same math as woodcutting) - Updated to match DB
 -- ============================================================
 
 AtlasMiningConfig.LootSystem = {
@@ -117,7 +117,7 @@ AtlasMiningConfig.LootSystem = {
     baseWeights = {
         iron_ore_crude = 100,    -- Always abundant
         iron_ore_common = 20,    -- Starts appearing around level 15
-        iron_ore_rare = 6,       -- Starts appearing around level 35
+        iron_ore_great = 6,      -- Starts appearing around level 35
         iron_ore_superior = 2,   -- Starts appearing around level 60
         iron_ore_legendary = 0.5 -- Starts appearing around level 85
     },
@@ -126,7 +126,7 @@ AtlasMiningConfig.LootSystem = {
     levelRequirements = {
         iron_ore_crude = 1,
         iron_ore_common = 15,
-        iron_ore_rare = 35,
+        iron_ore_great = 35,
         iron_ore_superior = 60,
         iron_ore_legendary = 85
     },
@@ -135,7 +135,7 @@ AtlasMiningConfig.LootSystem = {
     levelScaling = {
         iron_ore_crude = 0,     -- No scaling (always same base weight)
         iron_ore_common = 30,   -- Reaches 2x base weight at level 45 (15 + 30)
-        iron_ore_rare = 35,     -- Reaches 2x base weight at level 70 (35 + 35)
+        iron_ore_great = 35,    -- Reaches 2x base weight at level 70 (35 + 35)
         iron_ore_superior = 25, -- Reaches 2x base weight at level 85 (60 + 25)
         iron_ore_legendary = 20 -- Reaches 2x base weight at level 105 (85 + 20, caps at 99)
     },
@@ -145,35 +145,35 @@ AtlasMiningConfig.LootSystem = {
         [1] = { -- Tier 1: Heavily favors crude
             iron_ore_crude = 1.0,
             iron_ore_common = 0.3,
-            iron_ore_rare = 0.0,
+            iron_ore_great = 0.0,
             iron_ore_superior = 0.0,
             iron_ore_legendary = 0.0
         },
         [2] = { -- Tier 2: Reduces crude, boosts common
             iron_ore_crude = 0.7,
             iron_ore_common = 1.5,
-            iron_ore_rare = 0.4,
+            iron_ore_great = 0.4,
             iron_ore_superior = 0.0,
             iron_ore_legendary = 0.0
         },
-        [3] = { -- Tier 3: Balanced, introduces rare
+        [3] = { -- Tier 3: Balanced, introduces great
             iron_ore_crude = 0.5,
             iron_ore_common = 1.2,
-            iron_ore_rare = 1.8,
+            iron_ore_great = 1.8,
             iron_ore_superior = 0.6,
             iron_ore_legendary = 0.0
         },
         [4] = { -- Tier 4: Reduces lower tiers, boosts superior
             iron_ore_crude = 0.3,
             iron_ore_common = 0.9,
-            iron_ore_rare = 1.4,
+            iron_ore_great = 1.4,
             iron_ore_superior = 2.2,
             iron_ore_legendary = 0.8
         },
         [5] = { -- Tier 5: Premium camp, best legendary chances
             iron_ore_crude = 0.2,
             iron_ore_common = 0.7,
-            iron_ore_rare = 1.0,
+            iron_ore_great = 1.0,
             iron_ore_superior = 1.8,
             iron_ore_legendary = 3.0
         }

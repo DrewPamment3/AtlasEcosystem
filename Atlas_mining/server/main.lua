@@ -214,6 +214,10 @@ local function AwardLoot(source, oreType, quantity, isBonus)
         return false
     end
 
+    if Config.DebugLogging then
+        print("^3[LOOT DEBUG]^7 Attempting to award " .. quantity .. "x " .. oreType .. " to player " .. source)
+    end
+
     local success, result = pcall(function()
         -- Use VORP core inventory system
         character.addItem(oreType, quantity)
@@ -231,13 +235,13 @@ local function AwardLoot(source, oreType, quantity, isBonus)
         VORPcore.NotifyRightTip(source, "~g~Received: " .. displayName .. quantityText .. bonusText, 3000)
 
         if Config.DebugLogging then
-            print("^2[LOOT AWARD]^7 Player " .. source .. " received " .. quantity .. "x " .. oreType .. bonusText)
+            print("^2[LOOT AWARD]^7 SUCCESS: Player " .. source .. " received " .. quantity .. "x " .. oreType .. bonusText)
         end
 
         return true
     else
         if Config.DebugLogging then
-            print("^1[LOOT AWARD]^7 Failed to award " .. oreType .. " to player " .. source .. ": " .. tostring(result))
+            print("^1[LOOT AWARD]^7 FAILED to award " .. oreType .. " to player " .. source .. ": " .. tostring(result))
         end
 
         VORPcore.NotifyRightTip(source, "~r~Failed to receive items - check your inventory", 4000)
