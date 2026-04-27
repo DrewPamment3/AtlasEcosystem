@@ -498,6 +498,15 @@ local function DrawMiningProgressBar()
     local x, y = 0.5, 0.85
     local width, height = 0.25, 0.02
     
+    -- Debug: Print progress values
+    if AtlasMiningConfig.DebugLogging then
+        if GetGameTimer() % 1000 < 50 then -- Print every ~1 second to avoid spam
+            print("^3[PROGRESS DEBUG]^7 Active: " .. tostring(miningProgress.active) .. 
+                  " | Hits: " .. miningProgress.hitsCompleted .. "/" .. miningProgress.hitsRequired .. 
+                  " | Progress: " .. string.format("%.2f", progress))
+        end
+    end
+    
     -- Background (dark grey)
     DrawRect(x, y, width, height, 64, 64, 64, 200)
     
@@ -540,16 +549,19 @@ local function DoMiningHit()
     -- Play mining swing animation
     PlayMineSwingAnimation()
     
-    -- Wait 80% through the animation, then play sound
-    Citizen.Wait(math.floor(miningProgress.animationDelay * 0.8))
+    -- Create a separate thread for sound timing so it doesn't block the main flow
+    Citizen.CreateThread(function()
+        -- Wait 80% through the animation, then play sound
+        Citizen.Wait(math.floor(miningProgress.animationDelay * 0.8))
+        
+        -- Play mining sound effect (pickaxe hitting rock)
+        local coords = GetEntityCoords(ped)
+        -- Using a generic "rock hit" sound from RDR2's audio system
+        Citizen.InvokeNative(0x67C540AA08E4A6F5, "Core_Hunting_Ore_Hit_Successful_01", coords.x, coords.y, coords.z, "HUD_SHOP_SOUNDSET", false, 0, false)
+    end)
     
-    -- Play mining sound effect (pickaxe hitting rock)
-    local coords = GetEntityCoords(ped)
-    -- Using a generic "rock hit" sound from RDR2's audio system
-    Citizen.InvokeNative(0x67C540AA08E4A6F5, "Core_Hunting_Ore_Hit_Successful_01", coords.x, coords.y, coords.z, "HUD_SHOP_SOUNDSET", false, 0, false)
-    
-    -- Wait for remaining animation time
-    Citizen.Wait(math.floor(miningProgress.animationDelay * 0.2))
+    -- Wait for full animation time
+    Citizen.Wait(miningProgress.animationDelay)
     
     -- Clear animation
     ClearPedTasks(ped)
