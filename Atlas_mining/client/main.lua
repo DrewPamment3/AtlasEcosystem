@@ -18,53 +18,61 @@ local function LoadMiningAudioBanks()
     
     print("^3[ATLAS MINING AUDIO]^7 Loading audio banks for RedM...")
     
-    -- Try to request audio banks with error handling
-    local success1 = pcall(function()
-        RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
-    end)
+    local banks = {"HUD_GOLD_MINING_SOUNDSET", "OFF_MISSION_SOUNDSET"}
     
-    local success2 = pcall(function()
-        RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
-    end)
-    
-    if success1 and success2 then
-        -- Wait a reasonable time for loading (RedM doesn't have reliable bank checking)
-        Citizen.Wait(2000)
-        audioLoaded = true
-        print("^2[ATLAS MINING AUDIO]^7 Audio banks requested successfully!")
-    else
-        print("^1[ATLAS MINING AUDIO]^7 Failed to request audio banks!")
-        audioLoaded = false
+    for _, bank in ipairs(banks) do
+        if not HasAmbientAudioBankLoaded(bank) then
+            RequestAmbientAudioBank(bank)
+            
+            local timeout = 0
+            while not HasAmbientAudioBankLoaded(bank) and timeout < 50 do
+                Citizen.Wait(100)
+                timeout = timeout + 1
+            end
+            
+            if HasAmbientAudioBankLoaded(bank) then
+                print("^2[ATLAS MINING AUDIO]^7 Loaded: " .. bank)
+            else
+                print("^1[ATLAS MINING AUDIO]^7 Failed to load: " .. bank)
+            end
+        else
+            print("^2[ATLAS MINING AUDIO]^7 Already loaded: " .. bank)
+        end
     end
+    
+    audioLoaded = true
+    print("^2[ATLAS MINING AUDIO]^7 Audio system ready!")
 end
 
--- Simplified sound playing function for RedM
+-- RDR3/RedM sound playing function with correct native signatures
 local function PlayMiningSound(soundName, soundSet)
-    -- Try to play the sound directly with error handling
+    -- RDR3 PlaySoundFrontend: (soundName, soundSet, p2, p3)
+    -- No soundId/integer as the first argument like GTA V
     local success = pcall(function()
-        -- Method 1: Try PlaySoundFrontend (most compatible)
-        PlaySoundFrontend(-1, soundName, soundSet, true)
+        PlaySoundFrontend(soundName, soundSet, true, 0)
     end)
     
-    if not success then
-        -- Method 2: Try with GetSoundId and PlaySoundFromEntity
+    if success then
+        if AtlasMiningConfig.DebugLogging then
+            print("^2[MINING SOUND]^7 Played: " .. soundName .. " from " .. soundSet)
+        end
+        return true
+    else
+        -- Fallback: Try PlaySoundFromEntity if PlaySoundFrontend fails
         local success2 = pcall(function()
-            local soundId = GetSoundId()
-            PlaySoundFromEntity(soundId, soundName, PlayerPedId(), soundSet, true, 0)
-            ReleaseSoundId(soundId)
+            PlaySoundFromEntity(soundName, PlayerPedId(), soundSet, true, 0, 0)
         end)
         
-        if not success2 then
+        if success2 then
+            if AtlasMiningConfig.DebugLogging then
+                print("^2[MINING SOUND]^7 Played (fallback): " .. soundName .. " from " .. soundSet)
+            end
+            return true
+        else
             print("^1[MINING SOUND]^7 Failed to play sound: " .. soundName .. " from " .. soundSet)
             return false
         end
     end
-    
-    if AtlasMiningConfig.DebugLogging then
-        print("^2[MINING SOUND]^7 Played: " .. soundName .. " from " .. soundSet)
-    end
-    
-    return true
 end
 
 -- Load audio banks on script start
