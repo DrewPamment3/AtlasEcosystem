@@ -16,7 +16,6 @@ client_scripts {
 }
 
 server_scripts {
-    'server/tool_validation.lua',
     'server/main.lua'
 }
 
