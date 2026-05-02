@@ -16,47 +16,43 @@ local audioLoaded = false
 local function LoadMiningAudioBanks()
     if audioLoaded then return end
     
-    print("^3[ATLAS MINING AUDIO]^7 Loading audio banks...")
+    print("^3[ATLAS MINING AUDIO]^7 Loading audio banks for RedM...")
     
-    -- Load required soundsets for mining
-    RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
-    RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
+    -- Try different RedM audio loading methods
+    local loadSuccess = false
     
-    -- Wait for audio banks to load (RedM uses different natives than FiveM)
-    local timeout = GetGameTimer() + 5000
-    local hudLoaded, offLoaded = false, false
+    -- Method 1: Try RequestScriptAudioBank (RedM alternative)
+    local success1 = pcall(function()
+        RequestScriptAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
+        RequestScriptAudioBank("OFF_MISSION_SOUNDSET", false)
+        loadSuccess = true
+        print("^2[ATLAS MINING AUDIO]^7 Using RequestScriptAudioBank method")
+    end)
     
-    while (not hudLoaded or not offLoaded) and GetGameTimer() < timeout do
-        -- Check if banks are loaded (try different methods for RedM compatibility)
-        local success1, result1 = pcall(function()
-            return HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET")
+    if not success1 then
+        -- Method 2: Try AUDIO natives with Citizen.InvokeNative
+        local success2 = pcall(function()
+            Citizen.InvokeNative(0x956F5470024D5CE1, "HUD_GOLD_MINING_SOUNDSET", false) -- REQUEST_SCRIPT_AUDIO_BANK
+            Citizen.InvokeNative(0x956F5470024D5CE1, "OFF_MISSION_SOUNDSET", false)
+            loadSuccess = true
+            print("^2[ATLAS MINING AUDIO]^7 Using Citizen.InvokeNative method")
         end)
         
-        local success2, result2 = pcall(function()
-            return HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")
-        end)
-        
-        -- If the native calls work, use their results
-        if success1 then hudLoaded = result1 end
-        if success2 then offLoaded = result2 end
-        
-        -- If natives don't work, assume loaded after reasonable wait
-        if not success1 and not success2 and GetGameTimer() > (timeout - 3000) then
-            hudLoaded, offLoaded = true, true
-            print("^3[ATLAS MINING AUDIO]^7 Audio bank natives unavailable, assuming loaded")
+        if not success2 then
+            -- Method 3: Just mark as loaded and try sounds directly
+            print("^3[ATLAS MINING AUDIO]^7 No audio bank loading method available - will attempt direct sound playback")
+            loadSuccess = true
         end
-        
-        Citizen.Wait(100)
     end
     
-    if hudLoaded and offLoaded then
+    if loadSuccess then
+        -- Wait a moment for any loading to complete
+        Citizen.Wait(1000)
         audioLoaded = true
-        print("^2[ATLAS MINING AUDIO]^7 Audio banks loaded successfully!")
+        print("^2[ATLAS MINING AUDIO]^7 Audio system ready for RedM!")
     else
-        print("^1[ATLAS MINING AUDIO]^7 Failed to load audio banks within timeout!")
-        -- For RedM compatibility, still mark as loaded to allow sound attempts
-        audioLoaded = true
-        print("^3[ATLAS MINING AUDIO]^7 Marking as loaded for RedM compatibility")
+        print("^1[ATLAS MINING AUDIO]^7 Failed to initialize audio system")
+        audioLoaded = false
     end
 end
 
