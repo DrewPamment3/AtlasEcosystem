@@ -18,7 +18,7 @@ AtlasMiningConfig.Interruption = {
 }
 
 -- Debug Logging (set to false in production)
-AtlasMiningConfig.DebugLogging = true -- Toggle all debug output
+AtlasMiningConfig.DebugLogging = false -- Toggle all debug output
 
 -- Distance & Rendering
 AtlasMiningConfig.RenderDistance = 400       -- Max distance to render camps (meters)
@@ -496,14 +496,14 @@ AtlasMiningConfig.PickaxeAttachBone = 7966
 
 AtlasMiningConfig.SoundEffects = {
     enabled = true, -- Set to false to disable all mining sounds
-    
+
     -- Sound timing (milliseconds into the 2500ms animation)
     timing = {
         pickaxeStrike = 1300, -- Main pickaxe strike sound
         metalHit = 1400,      -- Metallic "ting" sound (100ms after strike)
         rockChip = 1600       -- Rock chipping sound (300ms after strike)
     },
-    
+
     -- Sound definitions (Audio Name, Audio Ref/Soundset, Description)
     sounds = {
         pickaxeStrike = { name = "PICKAXE_DIG", soundset = "OFF_MISSION_SOUNDSET", description = "Standard pickaxe strike" },

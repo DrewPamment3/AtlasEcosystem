@@ -194,10 +194,11 @@ local function AwardLoot(source, woodType, quantity, isBonus)
 end
 
 -- Main loot calculation and award function
-local function ProcessWoodcuttingLoot(source, groveTier)
+local function ProcessWoodcuttingLoot(source, groveTier, axeTier)
     print("^3[ProcessWoodcuttingLoot DEBUG]^7 === FUNCTION CALLED ===")
     print("^3[ProcessWoodcuttingLoot DEBUG]^7 Source: " .. tostring(source))
     print("^3[ProcessWoodcuttingLoot DEBUG]^7 Grove Tier: " .. tostring(groveTier))
+    print("^3[ProcessWoodcuttingLoot DEBUG]^7 Axe Tier: " .. tostring(axeTier or "nil"))
     
     -- Get player's woodcutting level using synchronous version
     local success, playerLevel = pcall(function()
@@ -209,8 +210,8 @@ local function ProcessWoodcuttingLoot(source, groveTier)
         return false -- Return false to indicate no bonus loot
     end
     
-    -- Get player's axe tier
-    local axeTier = GetPlayerAxeTier(source)
+    -- Use provided axe tier or fallback to old method
+    axeTier = axeTier or GetPlayerAxeTier(source)
     
     if Config.DebugLogging then
         print("^3[LOOT DEBUG]^7 Player " .. source .. " - Level: " .. playerLevel .. " - Grove Tier: " .. groveTier .. " - Axe Tier: " .. axeTier)
@@ -865,7 +866,7 @@ RegisterCommand('simulateloot', function(source, args)
     print("^2[LOOT SIMULATE]^7 Simulating complete woodcutting experience for player " .. _source .. " in tier " .. groveTier .. " grove")
     
     -- Process loot and get bonus status
-    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier)
+    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier, 1) -- Default to tier 1 for this call
     
     -- Get player's axe tier and calculate XP
     local axeTier = GetPlayerAxeTier(_source)
@@ -1233,13 +1234,38 @@ RegisterCommand('listforests', function(source, args)
         end)
 end)
 
+-- Handle validation requests from client
+RegisterServerEvent('atlas_woodcutting:server:requestValidation')
+AddEventHandler('atlas_woodcutting:server:requestValidation', function(forestId)
+    local _source = source
+    
+    -- Get forest info for validation
+    local forest = GetForestById(forestId)
+    if not forest then
+        -- Send error response
+        TriggerClientEvent('atlas_woodcutting:client:validationResult', _source, forestId, "CHOP TREE (Error)", true)
+        return
+    end
+    
+    -- Validate tools and level for this forest tier
+    local validation = ValidateWoodcuttingTools(_source, forest.tier)
+    local promptText, isDisabled = GetWoodcuttingPromptText(validation)
+    
+    -- Send validation result to client
+    TriggerClientEvent('atlas_woodcutting:client:validationResult', _source, forestId, promptText, isDisabled)
+    
+    if Config.DebugLogging then
+        print("^3[VALIDATION]^7 Player " .. _source .. " - Forest " .. forestId .. " (Tier " .. forest.tier .. ") - " .. promptText .. " (disabled: " .. tostring(isDisabled) .. ")")
+    end
+end)
+
 RegisterServerEvent('atlas_woodcutting:server:requestStart')
 AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forestId, treeIndex, nodeData)
     local _source = source
     print("^2[CHOP FLOW]^7 requestStart [SERVER] - Player " ..
     _source .. " | Forest " .. forestId .. " | Tree " .. treeIndex)
 
-    -- Get forest info for level validation
+    -- Get forest info for validation
     local forest = GetForestById(forestId)
     if not forest then
         print("^1[CHOP FLOW]^7 ERROR: Forest " .. forestId .. " not found")
@@ -1248,25 +1274,19 @@ AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forest
     
     local groveTier = forest.tier
     
-    -- Check if player meets grove level requirement BEFORE starting animation
-    local success, playerLevel = pcall(function()
-        return exports['Atlas_skilling']:GetSkillLevelSync(_source, 'woodcutting')
-    end)
+    -- NEW: Comprehensive tool and level validation
+    local validation = ValidateWoodcuttingTools(_source, groveTier)
     
-    if not success then
-        print("^1[CHOP FLOW]^7 ERROR: Could not get player level")
+    if not validation.hasValidTool or not validation.levelValid then
+        print("^3[CHOP FLOW]^7 Player " .. _source .. " validation failed: " .. (validation.errorMessage or "Unknown error"))
+        VORPcore.NotifyRightTip(_source, "~r~" .. (validation.errorMessage or "Cannot chop this tree"), 4000)
         return
     end
     
-    -- Check grove unlock requirements
-    local requiredLevel = AtlasWoodConfig.GroveUnlocks[groveTier]
-    if requiredLevel and playerLevel < requiredLevel then
-        print("^3[CHOP FLOW]^7 Player " .. _source .. " level " .. playerLevel .. " cannot access tier " .. groveTier .. " grove (requires level " .. requiredLevel .. ")")
-        VORPcore.NotifyRightTip(_source, "~r~Come back when you improve (Level Required: " .. requiredLevel .. ")", 4000)
-        return -- Stop here - don't start the animation
+    print("^2[CHOP FLOW]^7 Validation passed - Player has " .. validation.bestTool.name .. " (tier " .. validation.bestTool.tier .. ", durability " .. validation.bestTool.durability .. ")")
+    if validation.willBreak then
+        print("^3[CHOP FLOW]^7 WARNING: Tool will break after this action!")
     end
-    
-    print("^2[CHOP FLOW]^7 Level check passed - Player level " .. playerLevel .. " can access tier " .. groveTier .. " grove")
 
     local token = "CHOP_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
@@ -1274,7 +1294,8 @@ AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forest
         startTime = os.time(),
         forestId = forestId,
         treeIndex = treeIndex,
-        nodeData = nodeData
+        nodeData = nodeData,
+        toolData = validation.bestTool -- Store tool info for durability handling
     }
     print("^2[CHOP FLOW]^7 Token created: " .. token)
     print("^2[CHOP FLOW]^7 Sending beginMinigame to client " .. _source)
@@ -1305,11 +1326,18 @@ AddEventHandler('atlas_woodcutting:server:finishChop', function(token)
     local forest = GetForestById(forestId)
     local groveTier = forest and forest.tier or 1
 
-    -- NEW: Process loot rewards and get bonus loot status for XP calculation
-    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier)
+    -- NEW: Handle tool durability first
+    local toolData = task.toolData
+    if toolData then
+        local durabilitySuccess = HandleAxeDurability(_source, toolData)
+        if not durabilitySuccess then
+            print("^1[CHOP FLOW]^7 ERROR: Failed to handle tool durability")
+        end
+    end
     
-    -- Get player's axe tier for XP calculation
-    local axeTier = GetPlayerAxeTier(_source)
+    -- Process loot rewards and get bonus loot status for XP calculation
+    local axeTier = toolData and toolData.tier or 1
+    local hasBonusLoot = ProcessWoodcuttingLoot(_source, groveTier, axeTier)
     
     -- Calculate XP reward based on grove tier, axe tier, and bonus loot
     local xpReward = AtlasWoodConfig.CalculateXPReward(groveTier, axeTier, hasBonusLoot)

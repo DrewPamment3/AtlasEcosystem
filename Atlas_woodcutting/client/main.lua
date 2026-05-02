@@ -3,6 +3,11 @@ local GroveRegistry = {}   -- {forestId, treeIndex, coords, entity (tree or stum
 local RenderedForests = {} -- Forests currently being rendered
 local TreeStumpMap = {}    -- Map of treeIndex -> stump entity for quick lookup
 
+-- Tool validation cache
+local ValidationCache = {} -- Cache validation results to avoid spamming server
+local LastValidationRequest = 0 -- Prevent spamming validation requests
+local CurrentPromptState = { text = "CHOP TREE", disabled = false } -- Current prompt state
+
 -- VORP Lumberjack-style animation variables
 local tool, hastool = nil, false
 local swing = 0
@@ -157,20 +162,36 @@ local function EquipTool(toolhash)
 end
 
 -- [[ UI ]]
-local function DrawWoodcuttingPrompt()
+local function DrawWoodcuttingPrompt(promptText, isDisabled)
+    promptText = promptText or "CHOP TREE"
+    isDisabled = isDisabled or false
+    
     local x, y = 0.5, 0.92
-    DrawRect(x, y, 0.12, 0.045, 0, 0, 0, 180)
+    local promptWidth = 0.15 -- Wider to accommodate longer text
+    
+    -- Background color - darker if disabled
+    local bgAlpha = isDisabled and 120 or 180
+    DrawRect(x, y, promptWidth, 0.045, 0, 0, 0, bgAlpha)
+    
+    -- G key button
+    local buttonColor = isDisabled and {150, 150, 150, 255} or {255, 255, 255, 255}
     SetTextScale(0.38, 0.38)
     SetTextColor(0, 0, 0, 255)
     SetTextCentre(true)
     local gText = CreateVarString(10, "LITERAL_STRING", "G")
-    DrawRect(x - 0.035, y, 0.022, 0.032, 255, 255, 255, 255)
-    DisplayText(gText, x - 0.035, y - 0.016)
-    SetTextScale(0.35, 0.35)
-    SetTextColor(255, 255, 255, 255)
+    DrawRect(x - 0.055, y, 0.022, 0.032, buttonColor[1], buttonColor[2], buttonColor[3], buttonColor[4])
+    DisplayText(gText, x - 0.055, y - 0.016)
+    
+    -- Prompt text - greyed out if disabled
+    SetTextScale(0.32, 0.32) -- Smaller text to fit longer messages
+    if isDisabled then
+        SetTextColor(150, 150, 150, 255) -- Grey text for disabled
+    else
+        SetTextColor(255, 255, 255, 255) -- White text for enabled
+    end
     SetTextCentre(false)
     SetTextFontForCurrentCommand(1)
-    DisplayText(CreateVarString(10, "LITERAL_STRING", "CHOP TREE"), x - 0.018, y - 0.016)
+    DisplayText(CreateVarString(10, "LITERAL_STRING", promptText), x - 0.035, y - 0.016)
 end
 
 -- [[ SPAWNING ]]
@@ -221,6 +242,30 @@ local function SpawnLocalTree(node, forestId, treeIndex, isStump)
     return tree
 end
 
+-- Function to request validation from server (throttled to prevent spam)
+local function RequestValidation(forestId)
+    local currentTime = GetGameTimer()
+    if currentTime - LastValidationRequest < 2000 then -- 2 second throttle
+        return false
+    end
+    
+    LastValidationRequest = currentTime
+    TriggerServerEvent('atlas_woodcutting:server:requestValidation', forestId)
+    return true
+end
+
+-- Event to receive validation results from server
+RegisterNetEvent('atlas_woodcutting:client:validationResult')
+AddEventHandler('atlas_woodcutting:client:validationResult', function(forestId, promptText, isDisabled)
+    ValidationCache[forestId] = {
+        promptText = promptText,
+        isDisabled = isDisabled,
+        timestamp = GetGameTimer()
+    }
+    CurrentPromptState.text = promptText
+    CurrentPromptState.disabled = isDisabled
+end)
+
 -- [[ INTERACTION LOOP ]]
 Citizen.CreateThread(function()
     while true do
@@ -249,13 +294,31 @@ Citizen.CreateThread(function()
             end
 
             if matchedNode then
-                DrawWoodcuttingPrompt()
-                if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy then
+                -- Check if we have cached validation for this forest
+                local forestId = matchedNode.forestId
+                local cachedValidation = ValidationCache[forestId]
+                local currentTime = GetGameTimer()
+                
+                -- If no cache or cache is old (>10 seconds), request new validation
+                if not cachedValidation or (currentTime - cachedValidation.timestamp > 10000) then
+                    if RequestValidation(forestId) then
+                        -- Use default prompt while waiting for validation
+                        CurrentPromptState.text = "CHOP TREE"
+                        CurrentPromptState.disabled = false
+                    end
+                else
+                    -- Use cached validation
+                    CurrentPromptState.text = cachedValidation.promptText
+                    CurrentPromptState.disabled = cachedValidation.isDisabled
+                end
+                
+                DrawWoodcuttingPrompt(CurrentPromptState.text, CurrentPromptState.disabled)
+                
+                -- Only allow interaction if not disabled and not busy
+                if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy and not CurrentPromptState.disabled then
                     print("^2[INTERACTION DEBUG]^7 G key pressed! Starting chop request")
                     print("^2[INTERACTION DEBUG]^7 Forest: " ..
                     matchedNode.forestId .. " | Tree: " .. matchedNode.treeIndex)
-                    print("^2[INTERACTION DEBUG]^7 isBusy: " .. tostring(isBusy))
-                    print("^2[INTERACTION DEBUG]^7 Sending requestStart event to server...")
 
                     TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
                         matchedNode.treeIndex, {

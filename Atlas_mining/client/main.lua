@@ -3,6 +3,11 @@ local CampRegistry = {}    -- {campId, rockIndex, coords, entity (rock or mined)
 local RenderedCamps = {}   -- Camps currently being rendered
 local MinedRockMap = {}    -- Map of rockIndex -> depleted rock entity for quick lookup
 
+-- Tool validation cache
+local ValidationCache = {} -- Cache validation results to avoid spamming server
+local LastValidationRequest = 0 -- Prevent spamming validation requests
+local CurrentPromptState = { text = "MINE ROCK", disabled = false } -- Current prompt state
+
 -- Pickaxe prop state (vorp_mining animation logic)
 local tool = nil
 local hastool = false
@@ -94,20 +99,36 @@ Citizen.CreateThread(function()
 end)
 
 -- [[ UI ]]
-local function DrawMiningPrompt()
+local function DrawMiningPrompt(promptText, isDisabled)
+    promptText = promptText or "MINE ROCK"
+    isDisabled = isDisabled or false
+    
     local x, y = 0.5, 0.92
-    DrawRect(x, y, 0.12, 0.045, 0, 0, 0, 180)
+    local promptWidth = 0.15 -- Wider to accommodate longer text
+    
+    -- Background color - darker if disabled
+    local bgAlpha = isDisabled and 120 or 180
+    DrawRect(x, y, promptWidth, 0.045, 0, 0, 0, bgAlpha)
+    
+    -- G key button
+    local buttonColor = isDisabled and {150, 150, 150, 255} or {255, 255, 255, 255}
     SetTextScale(0.38, 0.38)
     SetTextColor(0, 0, 0, 255)
     SetTextCentre(true)
     local gText = CreateVarString(10, "LITERAL_STRING", "G")
-    DrawRect(x - 0.035, y, 0.022, 0.032, 255, 255, 255, 255)
-    DisplayText(gText, x - 0.035, y - 0.016)
-    SetTextScale(0.35, 0.35)
-    SetTextColor(255, 255, 255, 255)
+    DrawRect(x - 0.055, y, 0.022, 0.032, buttonColor[1], buttonColor[2], buttonColor[3], buttonColor[4])
+    DisplayText(gText, x - 0.055, y - 0.016)
+    
+    -- Prompt text - greyed out if disabled
+    SetTextScale(0.32, 0.32) -- Smaller text to fit longer messages
+    if isDisabled then
+        SetTextColor(150, 150, 150, 255) -- Grey text for disabled
+    else
+        SetTextColor(255, 255, 255, 255) -- White text for enabled
+    end
     SetTextCentre(false)
     SetTextFontForCurrentCommand(1)
-    DisplayText(CreateVarString(10, "LITERAL_STRING", "MINE ROCK"), x - 0.018, y - 0.016)
+    DisplayText(CreateVarString(10, "LITERAL_STRING", promptText), x - 0.035, y - 0.016)
 end
 
 -- [[ ANIMATION LOGIC (from vorp_mining) ]]
@@ -258,6 +279,30 @@ local function SpawnLocalRock(node, campId, rockIndex, isDepleted)
     return rock
 end
 
+-- Function to request validation from server (throttled to prevent spam)
+local function RequestValidation(campId)
+    local currentTime = GetGameTimer()
+    if currentTime - LastValidationRequest < 2000 then -- 2 second throttle
+        return false
+    end
+    
+    LastValidationRequest = currentTime
+    TriggerServerEvent('atlas_mining:server:requestValidation', campId)
+    return true
+end
+
+-- Event to receive validation results from server
+RegisterNetEvent('atlas_mining:client:validationResult')
+AddEventHandler('atlas_mining:client:validationResult', function(campId, promptText, isDisabled)
+    ValidationCache[campId] = {
+        promptText = promptText,
+        isDisabled = isDisabled,
+        timestamp = GetGameTimer()
+    }
+    CurrentPromptState.text = promptText
+    CurrentPromptState.disabled = isDisabled
+end)
+
 -- [[ INTERACTION LOOP ]]
 Citizen.CreateThread(function()
     while true do
@@ -290,8 +335,28 @@ Citizen.CreateThread(function()
             end
 
             if matchedNode then
-                DrawMiningPrompt()
-                if IsControlJustPressed(0, AtlasMiningConfig.InteractionKey) and not isBusy then
+                -- Check if we have cached validation for this camp
+                local campId = matchedNode.campId
+                local cachedValidation = ValidationCache[campId]
+                local currentTime = GetGameTimer()
+                
+                -- If no cache or cache is old (>10 seconds), request new validation
+                if not cachedValidation or (currentTime - cachedValidation.timestamp > 10000) then
+                    if RequestValidation(campId) then
+                        -- Use default prompt while waiting for validation
+                        CurrentPromptState.text = "MINE ROCK"
+                        CurrentPromptState.disabled = false
+                    end
+                else
+                    -- Use cached validation
+                    CurrentPromptState.text = cachedValidation.promptText
+                    CurrentPromptState.disabled = cachedValidation.isDisabled
+                end
+                
+                DrawMiningPrompt(CurrentPromptState.text, CurrentPromptState.disabled)
+                
+                -- Only allow interaction if not disabled and not busy
+                if IsControlJustPressed(0, AtlasMiningConfig.InteractionKey) and not isBusy and not CurrentPromptState.disabled then
                     print("^2[Mine Debug]^7 SUCCESS: Interaction for Camp " ..
                         matchedNode.campId .. " | Rock " .. matchedNode.rockIndex)
                     TriggerServerEvent('atlas_mining:server:requestStart', entCoords, matchedNode.campId,

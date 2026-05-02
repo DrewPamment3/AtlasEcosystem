@@ -243,7 +243,7 @@ local function AwardLoot(source, oreType, quantity, isBonus)
 end
 
 -- Main loot calculation and award function
-local function ProcessMiningLoot(source, campTier)
+local function ProcessMiningLoot(source, campTier, pickaxeTier)
     -- Get player's mining level
     local success, playerLevel = pcall(function()
         return exports['Atlas_skilling']:GetSkillLevel(source, 'mining')
@@ -255,8 +255,8 @@ local function ProcessMiningLoot(source, campTier)
         playerLevel = 1 -- Use fallback level instead of failing
     end
 
-    -- Get player's pickaxe tier
-    local pickaxeTier = GetPlayerPickaxeTier(source)
+    -- Use provided pickaxe tier or fallback to old method
+    pickaxeTier = pickaxeTier or GetPlayerPickaxeTier(source)
 
     if Config.DebugLogging then
         print("^3[LOOT DEBUG]^7 Player " .. source .. " - Level: " .. playerLevel .. " - Camp Tier: " .. campTier .. " - Pickaxe Tier: " .. pickaxeTier)
@@ -497,11 +497,59 @@ AddEventHandler('atlas_mining:server:saveNode', function(campId, coords, modelNa
         end)
 end)
 
+-- Handle validation requests from client
+RegisterServerEvent('atlas_mining:server:requestValidation')
+AddEventHandler('atlas_mining:server:requestValidation', function(campId)
+    local _source = source
+    
+    -- Get camp info for validation
+    local camp = GetCampById(campId)
+    if not camp then
+        -- Send error response
+        TriggerClientEvent('atlas_mining:client:validationResult', _source, campId, "MINE ROCK (Error)", true)
+        return
+    end
+    
+    -- Validate tools and level for this camp tier
+    local validation = ValidateMiningTools(_source, camp.tier)
+    local promptText, isDisabled = GetMiningPromptText(validation)
+    
+    -- Send validation result to client
+    TriggerClientEvent('atlas_mining:client:validationResult', _source, campId, promptText, isDisabled)
+    
+    if Config.DebugLogging then
+        print("^3[VALIDATION]^7 Player " .. _source .. " - Camp " .. campId .. " (Tier " .. camp.tier .. ") - " .. promptText .. " (disabled: " .. tostring(isDisabled) .. ")")
+    end
+end)
+
 RegisterServerEvent('atlas_mining:server:requestStart')
 AddEventHandler('atlas_mining:server:requestStart', function(coords, campId, rockIndex, nodeData)
     local _source = source
     print("^2[MINE FLOW]^7 requestStart [SERVER] - Player " ..
     _source .. " | Camp " .. campId .. " | Rock " .. rockIndex)
+
+    -- Get camp info for validation
+    local camp = GetCampById(campId)
+    if not camp then
+        print("^1[MINE FLOW]^7 ERROR: Camp " .. campId .. " not found")
+        return
+    end
+    
+    local campTier = camp.tier
+    
+    -- NEW: Comprehensive tool and level validation
+    local validation = ValidateMiningTools(_source, campTier)
+    
+    if not validation.hasValidTool or not validation.levelValid then
+        print("^3[MINE FLOW]^7 Player " .. _source .. " validation failed: " .. (validation.errorMessage or "Unknown error"))
+        VORPcore.NotifyRightTip(_source, "~r~" .. (validation.errorMessage or "Cannot mine this rock"), 4000)
+        return
+    end
+    
+    print("^2[MINE FLOW]^7 Validation passed - Player has " .. validation.bestTool.name .. " (tier " .. validation.bestTool.tier .. ", durability " .. validation.bestTool.durability .. ")")
+    if validation.willBreak then
+        print("^3[MINE FLOW]^7 WARNING: Tool will break after this action!")
+    end
 
     -- Use fixed number of hits from config (always 4 swings)
     local hitsRequired = Config.HitsRequired or 4
@@ -513,7 +561,8 @@ AddEventHandler('atlas_mining:server:requestStart', function(coords, campId, roc
         campId = campId,
         rockIndex = rockIndex,
         nodeData = nodeData,
-        hitsRequired = hitsRequired
+        hitsRequired = hitsRequired,
+        toolData = validation.bestTool -- Store tool info for durability handling
     }
     print("^2[MINE FLOW]^7 Token created: " .. token .. " | Hits required: " .. hitsRequired)
     print("^2[MINE FLOW]^7 Sending beginMining to client " .. _source)
@@ -544,11 +593,18 @@ AddEventHandler('atlas_mining:server:finishMine', function(token)
     local camp = GetCampById(campId)
     local campTier = camp and camp.tier or 1
 
+    -- NEW: Handle tool durability first
+    local toolData = task.toolData
+    if toolData then
+        local durabilitySuccess = HandlePickaxeDurability(_source, toolData)
+        if not durabilitySuccess then
+            print("^1[MINE FLOW]^7 ERROR: Failed to handle tool durability")
+        end
+    end
+    
     -- Process loot rewards and get bonus loot status for XP calculation
-    local hasBonusLoot = ProcessMiningLoot(_source, campTier)
-
-    -- Get player's pickaxe tier for XP calculation
-    local pickaxeTier = GetPlayerPickaxeTier(_source)
+    local pickaxeTier = toolData and toolData.tier or 1
+    local hasBonusLoot = ProcessMiningLoot(_source, campTier, pickaxeTier)
 
     -- Calculate XP reward based on camp tier, pickaxe tier, and bonus loot
     local xpReward = AtlasMiningConfig.CalculateXPReward(campTier, pickaxeTier, hasBonusLoot)
@@ -1125,7 +1181,7 @@ RegisterCommand('simulatemineloot', function(source, args)
     print("^2[LOOT SIMULATE]^7 Simulating complete mining experience for player " .. _source .. " in tier " .. campTier .. " camp")
 
     -- Process loot and get bonus status
-    local hasBonusLoot, gemDropped = ProcessMiningLoot(_source, campTier)
+    local hasBonusLoot, gemDropped = ProcessMiningLoot(_source, campTier, 1) -- Default to tier 1 for this call
 
     -- Get player's pickaxe tier and calculate XP
     local pickaxeTier = GetPlayerPickaxeTier(_source)
