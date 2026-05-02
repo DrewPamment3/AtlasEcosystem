@@ -610,15 +610,20 @@ AddEventHandler('atlas_mining:client:beginMining', function(token, hitsRequired)
         print("^2[MINE FLOW]^7 Starting interruption monitoring...")
         
         while hastool and miningProgress.active and not interrupted do
-            local currentCoords = GetEntityCoords(playerPed)
             local currentHealth = GetEntityHealth(playerPed)
             
-            -- 1. POSITION CHANGE DETECTION (larger threshold for animation stepping)
-            local distance = #(startCoords - currentCoords)
-            if distance > 2.5 then -- Larger threshold to account for animation root motion
-                interrupted = true
-                interruptionReason = "Player moved " .. string.format("%.1fm", distance) .. " from start position"
-                break
+            -- 1. MOVEMENT INPUT DETECTION (WASD keys) - RDR2 controls
+            local movementDetected = false
+            
+            -- Check for movement input (RDR2 control scheme)
+            if IsControlPressed(0, GetHashKey("INPUT_MOVE_UP_ONLY")) or      -- W
+               IsControlPressed(0, GetHashKey("INPUT_MOVE_DOWN_ONLY")) or    -- S  
+               IsControlPressed(0, GetHashKey("INPUT_MOVE_LEFT_ONLY")) or    -- A
+               IsControlPressed(0, GetHashKey("INPUT_MOVE_RIGHT_ONLY")) or   -- D
+               IsControlPressed(0, GetHashKey("INPUT_MOVE_LR")) or           -- Left stick
+               IsControlPressed(0, GetHashKey("INPUT_MOVE_UD")) then         -- Right stick
+                movementDetected = true
+                interruptionReason = "Movement input detected (player tried to move)"
             end
             
             -- 2. HEALTH/DAMAGE DETECTION
@@ -646,6 +651,13 @@ AddEventHandler('atlas_mining:client:beginMining', function(token, hitsRequired)
             if IsPedRagdoll(playerPed) then
                 interrupted = true
                 interruptionReason = "Player ragdolled"
+                break
+            end
+            
+            -- 6. MOVEMENT INPUT INTERRUPTION
+            if movementDetected then
+                interrupted = true
+                print("^1[MINE FLOW]^7 Interrupted - " .. interruptionReason)
                 break
             end
             
