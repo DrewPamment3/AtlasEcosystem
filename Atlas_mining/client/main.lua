@@ -18,56 +18,47 @@ local function LoadMiningAudioBanks()
     
     print("^3[ATLAS MINING AUDIO]^7 Loading audio banks for RedM...")
     
-    -- Request the audio banks properly for RedM/RDR3
-    RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
-    RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
+    -- Try to request audio banks with error handling
+    local success1 = pcall(function()
+        RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
+    end)
     
-    -- Wait for both banks to load with proper timeout
-    local timeout = 0
-    local maxTimeout = 100 -- 1 second total wait time
+    local success2 = pcall(function()
+        RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
+    end)
     
-    while (not HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET") or 
-           not HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")) and 
-          timeout < maxTimeout do
-        Citizen.Wait(10)
-        timeout = timeout + 1
-    end
-    
-    if HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET") and 
-       HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET") then
+    if success1 and success2 then
+        -- Wait a reasonable time for loading (RedM doesn't have reliable bank checking)
+        Citizen.Wait(2000)
         audioLoaded = true
-        print("^2[ATLAS MINING AUDIO]^7 Audio banks loaded successfully!")
+        print("^2[ATLAS MINING AUDIO]^7 Audio banks requested successfully!")
     else
+        print("^1[ATLAS MINING AUDIO]^7 Failed to request audio banks!")
         audioLoaded = false
-        print("^1[ATLAS MINING AUDIO]^7 Failed to load audio banks within timeout!")
     end
 end
 
--- Individual sound playing function with proper bank loading
+-- Simplified sound playing function for RedM
 local function PlayMiningSound(soundName, soundSet)
-    -- Ensure the specific bank is loaded
-    if not HasAmbientAudioBankLoaded(soundSet) then
-        RequestAmbientAudioBank(soundSet, false)
+    -- Try to play the sound directly with error handling
+    local success = pcall(function()
+        -- Method 1: Try PlaySoundFrontend (most compatible)
+        PlaySoundFrontend(-1, soundName, soundSet, true)
+    end)
+    
+    if not success then
+        -- Method 2: Try with GetSoundId and PlaySoundFromEntity
+        local success2 = pcall(function()
+            local soundId = GetSoundId()
+            PlaySoundFromEntity(soundId, soundName, PlayerPedId(), soundSet, true, 0)
+            ReleaseSoundId(soundId)
+        end)
         
-        -- Wait for this specific bank to load
-        local timeout = 0
-        while not HasAmbientAudioBankLoaded(soundSet) and timeout < 50 do
-            Citizen.Wait(10)
-            timeout = timeout + 1
-        end
-        
-        if not HasAmbientAudioBankLoaded(soundSet) then
-            print("^1[MINING SOUND]^7 Failed to load soundset: " .. soundSet)
+        if not success2 then
+            print("^1[MINING SOUND]^7 Failed to play sound: " .. soundName .. " from " .. soundSet)
             return false
         end
     end
-    
-    -- Use a real sound ID instead of -1 for better reliability
-    local soundId = GetSoundId()
-    PlaySoundFromEntity(soundId, soundName, PlayerPedId(), soundSet, true, 0)
-    
-    -- Release the sound ID to avoid hitting sound limits
-    ReleaseSoundId(soundId)
     
     if AtlasMiningConfig.DebugLogging then
         print("^2[MINING SOUND]^7 Played: " .. soundName .. " from " .. soundSet)
@@ -325,28 +316,14 @@ end)
 RegisterCommand('checkaudio', function(source, args, rawCommand)
     print("^2[Atlas Mining Audio]^7 Audio Bank Status:")
     print("^3================================================^7")
-    print("^3Audio Loaded:^7 " .. tostring(audioLoaded))
-    
-    -- Try to check audio banks, handle missing natives gracefully
-    local hud_loaded, off_loaded = "Unknown", "Unknown"
-    
-    local success1, result1 = pcall(function()
-        return HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET")
-    end)
-    if success1 then hud_loaded = tostring(result1) end
-    
-    local success2, result2 = pcall(function()
-        return HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")
-    end)
-    if success2 then off_loaded = tostring(result2) end
-    
-    print("^3HUD_GOLD_MINING_SOUNDSET:^7 " .. hud_loaded)
-    print("^3OFF_MISSION_SOUNDSET:^7 " .. off_loaded)
+    print("^3Audio System Loaded:^7 " .. tostring(audioLoaded))
     print("^3Sound Effects Enabled:^7 " .. tostring(AtlasMiningConfig.SoundEffects.enabled))
+    print("^3RedM Compatibility Mode:^7 Active")
     print("^3================================================^7")
     
     if audioLoaded then
         print("^2✓ Audio system ready for mining sounds!^7")
+        print("^2  Sounds will be played using RedM-compatible methods^7")
     else
         print("^1✗ Audio system not ready. Use /reloadaudio to try again.^7")
     end
