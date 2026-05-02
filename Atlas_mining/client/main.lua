@@ -326,6 +326,80 @@ RegisterCommand('testspawn', function(source, args, rawCommand)
     })
 end)
 
+--- DEBUG: Test mining sound effects (/testminingsounds)
+RegisterCommand('testminingsounds', function(source, args, rawCommand)
+    if not AtlasMiningConfig.SoundEffects.enabled then
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 165, 0 },
+            multiline = true,
+            args = { "Mining Sounds", "Sound effects are disabled in config!" }
+        })
+        return
+    end
+
+    print("^2[Atlas Mining Sounds]^7 Testing mining sound sequence...")
+    TriggerEvent('chat:addMessage', {
+        color = { 0, 255, 0 },
+        multiline = true,
+        args = { "Mining Sounds", "Testing sound sequence - check console for details" }
+    })
+
+    local sounds = AtlasMiningConfig.SoundEffects.sounds
+    local timing = AtlasMiningConfig.SoundEffects.timing
+    
+    -- Test each sound with proper timing
+    Citizen.CreateThread(function()
+        print("^3[SOUND TEST]^7 Playing pickaxe strike sound...")
+        PlaySoundFrontend(-1, sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset, true)
+        
+        Citizen.Wait(timing.metalHit - timing.pickaxeStrike)
+        print("^3[SOUND TEST]^7 Playing metal hit sound...")
+        PlaySoundFrontend(-1, sounds.metalHit.name, sounds.metalHit.soundset, true)
+        
+        Citizen.Wait(timing.rockChip - timing.metalHit)
+        print("^3[SOUND TEST]^7 Playing rock chip sound...")
+        PlaySoundFrontend(-1, sounds.rockChip.name, sounds.rockChip.soundset, true)
+        
+        print("^2[SOUND TEST]^7 Sound test complete!")
+    end)
+end)
+
+--- DEBUG: Test individual mining sounds (/testminingsound <type>)
+RegisterCommand('testminingsound', function(source, args, rawCommand)
+    if not args[1] then
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 0, 0 },
+            multiline = true,
+            args = { "Mining Sounds", "Usage: /testminingsound [pickaxeStrike|metalHit|rockChip|pebbleDrop]" }
+        })
+        return
+    end
+
+    local soundType = args[1]
+    local sounds = AtlasMiningConfig.SoundEffects.sounds
+    
+    if not sounds[soundType] then
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 0, 0 },
+            multiline = true,
+            args = { "Mining Sounds", "Invalid sound type: " .. soundType }
+        })
+        return
+    end
+
+    local sound = sounds[soundType]
+    print("^2[SOUND TEST]^7 Playing " .. soundType .. ": " .. sound.name .. " from " .. sound.soundset)
+    print("^3[SOUND TEST]^7 Description: " .. sound.description)
+    
+    PlaySoundFrontend(-1, sound.name, sound.soundset, true)
+    
+    TriggerEvent('chat:addMessage', {
+        color = { 0, 255, 0 },
+        multiline = true,
+        args = { "Mining Sounds", "Played: " .. soundType .. " (" .. sound.description .. ")" }
+    })
+end)
+
 -- [[ EVENTS ]]
 
 RegisterNetEvent('atlas_mining:client:loadCamps')
@@ -558,13 +632,32 @@ local function DoMiningHit()
     
     -- Create a separate thread for sound timing so it doesn't block the main flow
     Citizen.CreateThread(function()
-        -- Wait 80% through the animation, then play sound
-        Citizen.Wait(math.floor(miningProgress.animationDelay * 0.8))
-        
-        -- Play mining sound effect (pickaxe hitting rock)
-        local coords = GetEntityCoords(ped)
-        -- Try different RDR2 mining/hitting sounds
-        Citizen.InvokeNative(0x67C540AA08E4A6F5, "CHECKPOINT_PERFECT", coords.x, coords.y, coords.z, "HUD_MINI_GAME_SOUNDSET", false, 0, false)
+        if AtlasMiningConfig.SoundEffects.enabled then
+            local sounds = AtlasMiningConfig.SoundEffects.sounds
+            local timing = AtlasMiningConfig.SoundEffects.timing
+            
+            -- Wait for pickaxe strike timing, then play main strike sound
+            Citizen.Wait(timing.pickaxeStrike)
+            PlaySoundFrontend(-1, sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset, true)
+            
+            -- Wait for metal hit timing, then play metallic "ting" sound
+            local metalDelay = timing.metalHit - timing.pickaxeStrike
+            if metalDelay > 0 then
+                Citizen.Wait(metalDelay)
+            end
+            PlaySoundFrontend(-1, sounds.metalHit.name, sounds.metalHit.soundset, true)
+            
+            -- Wait for rock chipping timing, then play chipping sound
+            local chipDelay = timing.rockChip - timing.metalHit
+            if chipDelay > 0 then
+                Citizen.Wait(chipDelay)
+            end
+            PlaySoundFrontend(-1, sounds.rockChip.name, sounds.rockChip.soundset, true)
+            
+            if AtlasMiningConfig.DebugLogging then
+                print("^3[MINE SOUNDS]^7 Played sound sequence: Strike → Metal Hit → Rock Chip")
+            end
+        end
     end)
     
     -- Wait for full animation time

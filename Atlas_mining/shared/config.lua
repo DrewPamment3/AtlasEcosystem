@@ -11,10 +11,10 @@ AtlasMiningConfig.HitAnimationTime = 2500 -- Time for each mining hit animation 
 -- Interruption Detection (cancels mining if player moves, takes damage, or enters combat)
 AtlasMiningConfig.Interruption = {
     enabled = true,
-    maxMovementDistance = 1.0,  -- Max distance from start before cancelling
-    checkInterval = 50,         -- How often to check for interruptions (ms)
-    healthCheckEnabled = true,  -- Cancel if player takes damage
-    combatCheckEnabled = true   -- Cancel if player enters combat
+    maxMovementDistance = 1.0, -- Max distance from start before cancelling
+    checkInterval = 50,        -- How often to check for interruptions (ms)
+    healthCheckEnabled = true, -- Cancel if player takes damage
+    combatCheckEnabled = true  -- Cancel if player enters combat
 }
 
 -- Debug Logging (set to false in production)
@@ -96,29 +96,29 @@ AtlasMiningConfig.PickaxeUnlocks = {
 
 AtlasMiningConfig.OreTiers = {
     -- COPPER (most common - good for beginners)
-    { id = 1,  metal = "copper", name = "copper_crude",     minLevel = 1,  baseWeight = 120, weightMultiplier = 1.0 },
-    { id = 2,  metal = "copper", name = "copper_common",    minLevel = 1,  baseWeight = 8,   weightMultiplier = 1.5 },
-    { id = 3,  metal = "copper", name = "copper_great",     minLevel = 20, baseWeight = 3,   weightMultiplier = 2.0 },
-    { id = 4,  metal = "copper", name = "copper_superior",  minLevel = 45, baseWeight = 1.5, weightMultiplier = 3.0 },
-    { id = 5,  metal = "copper", name = "copper_legendary", minLevel = 70, baseWeight = 0.8, weightMultiplier = 5.0, reqPickaxeTier = 4 },
+    { id = 1,  metal = "copper", name = "copper_crude",       minLevel = 1,  baseWeight = 120, weightMultiplier = 1.0 },
+    { id = 2,  metal = "copper", name = "copper_common",      minLevel = 1,  baseWeight = 8,   weightMultiplier = 1.5 },
+    { id = 3,  metal = "copper", name = "copper_great",       minLevel = 20, baseWeight = 3,   weightMultiplier = 2.0 },
+    { id = 4,  metal = "copper", name = "copper_superior",    minLevel = 45, baseWeight = 1.5, weightMultiplier = 3.0 },
+    { id = 5,  metal = "copper", name = "copper_legendary",   minLevel = 70, baseWeight = 0.8, weightMultiplier = 5.0, reqPickaxeTier = 4 },
     -- TIN (common - similar to copper)
-    { id = 6,  metal = "tin", name = "tin_crude",     minLevel = 1,  baseWeight = 100, weightMultiplier = 1.0 },
-    { id = 7,  metal = "tin", name = "tin_common",    minLevel = 1,  baseWeight = 7,   weightMultiplier = 1.5 },
-    { id = 8,  metal = "tin", name = "tin_great",     minLevel = 20, baseWeight = 2.5, weightMultiplier = 2.0 },
-    { id = 9,  metal = "tin", name = "tin_superior",  minLevel = 45, baseWeight = 1.2, weightMultiplier = 3.0 },
-    { id = 10, metal = "tin", name = "tin_legendary", minLevel = 70, baseWeight = 0.6, weightMultiplier = 5.0, reqPickaxeTier = 4 },
+    { id = 6,  metal = "tin",    name = "tin_crude",          minLevel = 1,  baseWeight = 100, weightMultiplier = 1.0 },
+    { id = 7,  metal = "tin",    name = "tin_common",         minLevel = 1,  baseWeight = 7,   weightMultiplier = 1.5 },
+    { id = 8,  metal = "tin",    name = "tin_great",          minLevel = 20, baseWeight = 2.5, weightMultiplier = 2.0 },
+    { id = 9,  metal = "tin",    name = "tin_superior",       minLevel = 45, baseWeight = 1.2, weightMultiplier = 3.0 },
+    { id = 10, metal = "tin",    name = "tin_legendary",      minLevel = 70, baseWeight = 0.6, weightMultiplier = 5.0, reqPickaxeTier = 4 },
     -- IRON (uncommon - mid-tier resource)
-    { id = 11, metal = "iron", name = "iron_ore_crude",     minLevel = 1,  baseWeight = 80,  weightMultiplier = 1.0 },
-    { id = 12, metal = "iron", name = "iron_ore_common",    minLevel = 10, baseWeight = 5,   weightMultiplier = 1.5 },
-    { id = 13, metal = "iron", name = "iron_ore_great",     minLevel = 30, baseWeight = 2,   weightMultiplier = 2.0 },
-    { id = 14, metal = "iron", name = "iron_ore_superior",  minLevel = 55, baseWeight = 1,   weightMultiplier = 3.0 },
-    { id = 15, metal = "iron", name = "iron_ore_legendary", minLevel = 80, baseWeight = 0.4, weightMultiplier = 5.0, reqPickaxeTier = 4 },
+    { id = 11, metal = "iron",   name = "iron_ore_crude",     minLevel = 1,  baseWeight = 80,  weightMultiplier = 1.0 },
+    { id = 12, metal = "iron",   name = "iron_ore_common",    minLevel = 10, baseWeight = 5,   weightMultiplier = 1.5 },
+    { id = 13, metal = "iron",   name = "iron_ore_great",     minLevel = 30, baseWeight = 2,   weightMultiplier = 2.0 },
+    { id = 14, metal = "iron",   name = "iron_ore_superior",  minLevel = 55, baseWeight = 1,   weightMultiplier = 3.0 },
+    { id = 15, metal = "iron",   name = "iron_ore_legendary", minLevel = 80, baseWeight = 0.4, weightMultiplier = 5.0, reqPickaxeTier = 4 },
     -- GOLD (rare - most valuable, hardest to find)
-    { id = 16, metal = "gold", name = "gold_crude",     minLevel = 20, baseWeight = 40,  weightMultiplier = 1.0 },
-    { id = 17, metal = "gold", name = "gold_common",    minLevel = 30, baseWeight = 3,   weightMultiplier = 1.5 },
-    { id = 18, metal = "gold", name = "gold_great",     minLevel = 50, baseWeight = 1,   weightMultiplier = 2.0 },
-    { id = 19, metal = "gold", name = "gold_superior",  minLevel = 75, baseWeight = 0.5, weightMultiplier = 3.0 },
-    { id = 20, metal = "gold", name = "gold_legendary", minLevel = 95, baseWeight = 0.2, weightMultiplier = 5.0, reqPickaxeTier = 5 }
+    { id = 16, metal = "gold",   name = "gold_crude",         minLevel = 20, baseWeight = 40,  weightMultiplier = 1.0 },
+    { id = 17, metal = "gold",   name = "gold_common",        minLevel = 30, baseWeight = 3,   weightMultiplier = 1.5 },
+    { id = 18, metal = "gold",   name = "gold_great",         minLevel = 50, baseWeight = 1,   weightMultiplier = 2.0 },
+    { id = 19, metal = "gold",   name = "gold_superior",      minLevel = 75, baseWeight = 0.5, weightMultiplier = 3.0 },
+    { id = 20, metal = "gold",   name = "gold_legendary",     minLevel = 95, baseWeight = 0.2, weightMultiplier = 5.0, reqPickaxeTier = 5 }
 }
 
 -- Camp-based multipliers (Higher tier = more rare ore weight)
@@ -231,34 +231,114 @@ AtlasMiningConfig.LootSystem = {
     -- Camp tier effects on each ore type (multipliers)
     campEffects = {
         [1] = { -- Tier 1: Copper & Tin only, heavily favors crude
-            copper_crude = 1.0,    copper_common = 0.3, copper_great = 0.0, copper_superior = 0.0, copper_legendary = 0.0,
-            tin_crude = 0.8,        tin_common = 0.2,    tin_great = 0.0,    tin_superior = 0.0,    tin_legendary = 0.0,
-            iron_ore_crude = 0.5,   iron_ore_common = 0.1, iron_ore_great = 0.0, iron_ore_superior = 0.0, iron_ore_legendary = 0.0,
-            gold_crude = 0.1,       gold_common = 0.0,   gold_great = 0.0,   gold_superior = 0.0,   gold_legendary = 0.0
+            copper_crude = 1.0,
+            copper_common = 0.3,
+            copper_great = 0.0,
+            copper_superior = 0.0,
+            copper_legendary = 0.0,
+            tin_crude = 0.8,
+            tin_common = 0.2,
+            tin_great = 0.0,
+            tin_superior = 0.0,
+            tin_legendary = 0.0,
+            iron_ore_crude = 0.5,
+            iron_ore_common = 0.1,
+            iron_ore_great = 0.0,
+            iron_ore_superior = 0.0,
+            iron_ore_legendary = 0.0,
+            gold_crude = 0.1,
+            gold_common = 0.0,
+            gold_great = 0.0,
+            gold_superior = 0.0,
+            gold_legendary = 0.0
         },
         [2] = { -- Tier 2: Introduces more common tiers, tiny gold
-            copper_crude = 0.8,    copper_common = 1.2, copper_great = 0.3, copper_superior = 0.0, copper_legendary = 0.0,
-            tin_crude = 0.7,        tin_common = 1.0,    tin_great = 0.3,    tin_superior = 0.0,    tin_legendary = 0.0,
-            iron_ore_crude = 0.6,   iron_ore_common = 0.8, iron_ore_great = 0.2, iron_ore_superior = 0.0, iron_ore_legendary = 0.0,
-            gold_crude = 0.2,       gold_common = 0.0,   gold_great = 0.0,   gold_superior = 0.0,   gold_legendary = 0.0
+            copper_crude = 0.8,
+            copper_common = 1.2,
+            copper_great = 0.3,
+            copper_superior = 0.0,
+            copper_legendary = 0.0,
+            tin_crude = 0.7,
+            tin_common = 1.0,
+            tin_great = 0.3,
+            tin_superior = 0.0,
+            tin_legendary = 0.0,
+            iron_ore_crude = 0.6,
+            iron_ore_common = 0.8,
+            iron_ore_great = 0.2,
+            iron_ore_superior = 0.0,
+            iron_ore_legendary = 0.0,
+            gold_crude = 0.2,
+            gold_common = 0.0,
+            gold_great = 0.0,
+            gold_superior = 0.0,
+            gold_legendary = 0.0
         },
         [3] = { -- Tier 3: Balanced, introduces great tiers
-            copper_crude = 0.5,    copper_common = 1.0, copper_great = 1.5, copper_superior = 0.4, copper_legendary = 0.0,
-            tin_crude = 0.5,        tin_common = 1.0,    tin_great = 1.5,    tin_superior = 0.4,    tin_legendary = 0.0,
-            iron_ore_crude = 0.4,   iron_ore_common = 0.7, iron_ore_great = 1.0, iron_ore_superior = 0.3, iron_ore_legendary = 0.0,
-            gold_crude = 0.3,       gold_common = 0.2,   gold_great = 0.4,   gold_superior = 0.0,   gold_legendary = 0.0
+            copper_crude = 0.5,
+            copper_common = 1.0,
+            copper_great = 1.5,
+            copper_superior = 0.4,
+            copper_legendary = 0.0,
+            tin_crude = 0.5,
+            tin_common = 1.0,
+            tin_great = 1.5,
+            tin_superior = 0.4,
+            tin_legendary = 0.0,
+            iron_ore_crude = 0.4,
+            iron_ore_common = 0.7,
+            iron_ore_great = 1.0,
+            iron_ore_superior = 0.3,
+            iron_ore_legendary = 0.0,
+            gold_crude = 0.3,
+            gold_common = 0.2,
+            gold_great = 0.4,
+            gold_superior = 0.0,
+            gold_legendary = 0.0
         },
         [4] = { -- Tier 4: Higher tiers appear, gold becomes viable
-            copper_crude = 0.3,    copper_common = 0.7, copper_great = 1.2, copper_superior = 1.8, copper_legendary = 0.6,
-            tin_crude = 0.3,        tin_common = 0.7,    tin_great = 1.2,    tin_superior = 1.8,    tin_legendary = 0.6,
-            iron_ore_crude = 0.2,   iron_ore_common = 0.5, iron_ore_great = 0.8, iron_ore_superior = 1.5, iron_ore_legendary = 0.5,
-            gold_crude = 0.4,       gold_common = 0.4,   gold_great = 0.8,   gold_superior = 1.0,   gold_legendary = 0.3
+            copper_crude = 0.3,
+            copper_common = 0.7,
+            copper_great = 1.2,
+            copper_superior = 1.8,
+            copper_legendary = 0.6,
+            tin_crude = 0.3,
+            tin_common = 0.7,
+            tin_great = 1.2,
+            tin_superior = 1.8,
+            tin_legendary = 0.6,
+            iron_ore_crude = 0.2,
+            iron_ore_common = 0.5,
+            iron_ore_great = 0.8,
+            iron_ore_superior = 1.5,
+            iron_ore_legendary = 0.5,
+            gold_crude = 0.4,
+            gold_common = 0.4,
+            gold_great = 0.8,
+            gold_superior = 1.0,
+            gold_legendary = 0.3
         },
         [5] = { -- Tier 5: Premium camp, best rare ore & legendary chances
-            copper_crude = 0.2,    copper_common = 0.5, copper_great = 0.9, copper_superior = 1.5, copper_legendary = 2.5,
-            tin_crude = 0.2,        tin_common = 0.5,    tin_great = 0.9,    tin_superior = 1.5,    tin_legendary = 2.5,
-            iron_ore_crude = 0.15,  iron_ore_common = 0.4, iron_ore_great = 0.7, iron_ore_superior = 1.2, iron_ore_legendary = 2.0,
-            gold_crude = 0.5,       gold_common = 0.6,   gold_great = 1.2,   gold_superior = 2.0,   gold_legendary = 3.0
+            copper_crude = 0.2,
+            copper_common = 0.5,
+            copper_great = 0.9,
+            copper_superior = 1.5,
+            copper_legendary = 2.5,
+            tin_crude = 0.2,
+            tin_common = 0.5,
+            tin_great = 0.9,
+            tin_superior = 1.5,
+            tin_legendary = 2.5,
+            iron_ore_crude = 0.15,
+            iron_ore_common = 0.4,
+            iron_ore_great = 0.7,
+            iron_ore_superior = 1.2,
+            iron_ore_legendary = 2.0,
+            gold_crude = 0.5,
+            gold_common = 0.6,
+            gold_great = 1.2,
+            gold_superior = 2.0,
+            gold_legendary = 3.0
         }
     },
 
@@ -297,16 +377,16 @@ AtlasMiningConfig.GemSystem = {
 
     -- List of possible gems and their relative weights
     gems = {
-        { name = "uncut_amethyst",      weight = 15,  minLevel = 1 },
-        { name = "uncut_lapis_lazuli",  weight = 13,  minLevel = 1 },
-        { name = "uncut_topaz",         weight = 12,  minLevel = 1 },
-        { name = "uncut_emerald",       weight = 10,  minLevel = 5 },
-        { name = "uncut_sapphire",      weight = 9,   minLevel = 5 },
-        { name = "uncut_ruby",          weight = 8,   minLevel = 15 },
-        { name = "uncut_opal",          weight = 7,   minLevel = 25 },
-        { name = "uncut_jade",          weight = 6,   minLevel = 40 },
-        { name = "uncut_onyx",          weight = 4,   minLevel = 55 },
-        { name = "uncut_diamond",       weight = 3,   minLevel = 70 }
+        { name = "uncut_amethyst",     weight = 15, minLevel = 1 },
+        { name = "uncut_lapis_lazuli", weight = 13, minLevel = 1 },
+        { name = "uncut_topaz",        weight = 12, minLevel = 1 },
+        { name = "uncut_emerald",      weight = 10, minLevel = 5 },
+        { name = "uncut_sapphire",     weight = 9,  minLevel = 5 },
+        { name = "uncut_ruby",         weight = 8,  minLevel = 15 },
+        { name = "uncut_opal",         weight = 7,  minLevel = 25 },
+        { name = "uncut_jade",         weight = 6,  minLevel = 40 },
+        { name = "uncut_onyx",         weight = 4,  minLevel = 55 },
+        { name = "uncut_diamond",      weight = 3,  minLevel = 70 }
     }
 }
 
@@ -397,7 +477,7 @@ AtlasMiningConfig.XPSystem = {
 }
 
 -- ============================================================
--- ANIMATION CONFIG (from vorp_mining logic)
+-- ANIMATION & SOUND CONFIG (from vorp_mining logic)
 -- ============================================================
 
 -- Pickaxe prop model
@@ -409,6 +489,29 @@ AtlasMiningConfig.MiningAnimBody = "pre_swing_trans_after_swing"
 
 -- Bone index for attaching pickaxe (7966 = left hand / pitchfork carry bone)
 AtlasMiningConfig.PickaxeAttachBone = 7966
+
+-- ============================================================
+-- SOUND EFFECTS CONFIG
+-- ============================================================
+
+AtlasMiningConfig.SoundEffects = {
+    enabled = true, -- Set to false to disable all mining sounds
+    
+    -- Sound timing (milliseconds into the 2500ms animation)
+    timing = {
+        pickaxeStrike = 1300, -- Main pickaxe strike sound
+        metalHit = 1400,      -- Metallic "ting" sound (100ms after strike)
+        rockChip = 1600       -- Rock chipping sound (300ms after strike)
+    },
+    
+    -- Sound definitions (Audio Name, Audio Ref/Soundset, Description)
+    sounds = {
+        pickaxeStrike = { name = "PICKAXE_DIG", soundset = "OFF_MISSION_SOUNDSET", description = "Standard pickaxe strike" },
+        metalHit = { name = "PICKAXE_HIT", soundset = "HUD_GOLD_MINING_SOUNDSET", description = "Metallic ting sound" },
+        rockChip = { name = "CHIPPING_ROCK", soundset = "HUD_GOLD_MINING_SOUNDSET", description = "Scraping/chipping sound" },
+        pebbleDrop = { name = "PEBBLE_DROP_MASTER", soundset = "OFF_MISSION_SOUNDSET", description = "Small rocks falling" }
+    }
+}
 
 -- ============================================================
 -- LOOT CALCULATION FUNCTIONS (Same math as woodcutting)
