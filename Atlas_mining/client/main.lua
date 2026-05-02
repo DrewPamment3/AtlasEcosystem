@@ -18,42 +18,62 @@ local function LoadMiningAudioBanks()
     
     print("^3[ATLAS MINING AUDIO]^7 Loading audio banks for RedM...")
     
-    -- Try different RedM audio loading methods
-    local loadSuccess = false
+    -- Request the audio banks properly for RedM/RDR3
+    RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
+    RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
     
-    -- Method 1: Try RequestScriptAudioBank (RedM alternative)
-    local success1 = pcall(function()
-        RequestScriptAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
-        RequestScriptAudioBank("OFF_MISSION_SOUNDSET", false)
-        loadSuccess = true
-        print("^2[ATLAS MINING AUDIO]^7 Using RequestScriptAudioBank method")
-    end)
+    -- Wait for both banks to load with proper timeout
+    local timeout = 0
+    local maxTimeout = 100 -- 1 second total wait time
     
-    if not success1 then
-        -- Method 2: Try AUDIO natives with Citizen.InvokeNative
-        local success2 = pcall(function()
-            Citizen.InvokeNative(0x956F5470024D5CE1, "HUD_GOLD_MINING_SOUNDSET", false) -- REQUEST_SCRIPT_AUDIO_BANK
-            Citizen.InvokeNative(0x956F5470024D5CE1, "OFF_MISSION_SOUNDSET", false)
-            loadSuccess = true
-            print("^2[ATLAS MINING AUDIO]^7 Using Citizen.InvokeNative method")
-        end)
+    while (not HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET") or 
+           not HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")) and 
+          timeout < maxTimeout do
+        Citizen.Wait(10)
+        timeout = timeout + 1
+    end
+    
+    if HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET") and 
+       HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET") then
+        audioLoaded = true
+        print("^2[ATLAS MINING AUDIO]^7 Audio banks loaded successfully!")
+    else
+        audioLoaded = false
+        print("^1[ATLAS MINING AUDIO]^7 Failed to load audio banks within timeout!")
+    end
+end
+
+-- Individual sound playing function with proper bank loading
+local function PlayMiningSound(soundName, soundSet)
+    -- Ensure the specific bank is loaded
+    if not HasAmbientAudioBankLoaded(soundSet) then
+        RequestAmbientAudioBank(soundSet, false)
         
-        if not success2 then
-            -- Method 3: Just mark as loaded and try sounds directly
-            print("^3[ATLAS MINING AUDIO]^7 No audio bank loading method available - will attempt direct sound playback")
-            loadSuccess = true
+        -- Wait for this specific bank to load
+        local timeout = 0
+        while not HasAmbientAudioBankLoaded(soundSet) and timeout < 50 do
+            Citizen.Wait(10)
+            timeout = timeout + 1
+        end
+        
+        if not HasAmbientAudioBankLoaded(soundSet) then
+            print("^1[MINING SOUND]^7 Failed to load soundset: " .. soundSet)
+            return false
         end
     end
     
-    if loadSuccess then
-        -- Wait a moment for any loading to complete
-        Citizen.Wait(1000)
-        audioLoaded = true
-        print("^2[ATLAS MINING AUDIO]^7 Audio system ready for RedM!")
-    else
-        print("^1[ATLAS MINING AUDIO]^7 Failed to initialize audio system")
-        audioLoaded = false
+    -- Use a real sound ID instead of -1 for better reliability
+    local soundId = GetSoundId()
+    PlaySoundFromEntity(soundId, soundName, PlayerPedId(), soundSet, true, 0)
+    
+    -- Release the sound ID to avoid hitting sound limits
+    ReleaseSoundId(soundId)
+    
+    if AtlasMiningConfig.DebugLogging then
+        print("^2[MINING SOUND]^7 Played: " .. soundName .. " from " .. soundSet)
     end
+    
+    return true
 end
 
 -- Load audio banks on script start
@@ -439,17 +459,6 @@ RegisterCommand('testminingsounds', function(source, args, rawCommand)
         return
     end
 
-    if not audioLoaded then
-        print("^1[Atlas Mining Sounds]^7 Audio banks not loaded! Attempting to load...")
-        TriggerEvent('chat:addMessage', {
-            color = { 255, 0, 0 },
-            multiline = true,
-            args = { "Mining Sounds", "Audio banks not loaded! Check console." }
-        })
-        LoadMiningAudioBanks()
-        return
-    end
-
     print("^2[Atlas Mining Sounds]^7 Testing mining sound sequence...")
     TriggerEvent('chat:addMessage', {
         color = { 0, 255, 0 },
@@ -460,18 +469,18 @@ RegisterCommand('testminingsounds', function(source, args, rawCommand)
     local sounds = AtlasMiningConfig.SoundEffects.sounds
     local timing = AtlasMiningConfig.SoundEffects.timing
     
-    -- Test each sound with proper timing
+    -- Test each sound with proper timing and individual bank loading
     Citizen.CreateThread(function()
         print("^3[SOUND TEST]^7 Playing pickaxe strike sound...")
-        PlaySoundFrontend(-1, sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset, true)
+        PlayMiningSound(sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset)
         
         Citizen.Wait(timing.metalHit - timing.pickaxeStrike)
         print("^3[SOUND TEST]^7 Playing metal hit sound...")
-        PlaySoundFrontend(-1, sounds.metalHit.name, sounds.metalHit.soundset, true)
+        PlayMiningSound(sounds.metalHit.name, sounds.metalHit.soundset)
         
         Citizen.Wait(timing.rockChip - timing.metalHit)
         print("^3[SOUND TEST]^7 Playing rock chip sound...")
-        PlaySoundFrontend(-1, sounds.rockChip.name, sounds.rockChip.soundset, true)
+        PlayMiningSound(sounds.rockChip.name, sounds.rockChip.soundset)
         
         print("^2[SOUND TEST]^7 Sound test complete!")
     end)
@@ -485,17 +494,6 @@ RegisterCommand('testminingsound', function(source, args, rawCommand)
             multiline = true,
             args = { "Mining Sounds", "Usage: /testminingsound [pickaxeStrike|metalHit|rockChip|pebbleDrop]" }
         })
-        return
-    end
-
-    if not audioLoaded then
-        print("^1[Atlas Mining Sounds]^7 Audio banks not loaded! Attempting to load...")
-        TriggerEvent('chat:addMessage', {
-            color = { 255, 0, 0 },
-            multiline = true,
-            args = { "Mining Sounds", "Audio banks not loaded! Check console." }
-        })
-        LoadMiningAudioBanks()
         return
     end
 
@@ -515,7 +513,8 @@ RegisterCommand('testminingsound', function(source, args, rawCommand)
     print("^2[SOUND TEST]^7 Playing " .. soundType .. ": " .. sound.name .. " from " .. sound.soundset)
     print("^3[SOUND TEST]^7 Description: " .. sound.description)
     
-    PlaySoundFrontend(-1, sound.name, sound.soundset, true)
+    -- Use the new proper sound system
+    PlayMiningSound(sound.name, sound.soundset)
     
     TriggerEvent('chat:addMessage', {
         color = { 0, 255, 0 },
@@ -762,21 +761,21 @@ local function DoMiningHit()
             
             -- Wait for pickaxe strike timing, then play main strike sound
             Citizen.Wait(timing.pickaxeStrike)
-            PlaySoundFrontend(-1, sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset, true)
+            PlayMiningSound(sounds.pickaxeStrike.name, sounds.pickaxeStrike.soundset)
             
             -- Wait for metal hit timing, then play metallic "ting" sound
             local metalDelay = timing.metalHit - timing.pickaxeStrike
             if metalDelay > 0 then
                 Citizen.Wait(metalDelay)
             end
-            PlaySoundFrontend(-1, sounds.metalHit.name, sounds.metalHit.soundset, true)
+            PlayMiningSound(sounds.metalHit.name, sounds.metalHit.soundset)
             
             -- Wait for rock chipping timing, then play chipping sound
             local chipDelay = timing.rockChip - timing.metalHit
             if chipDelay > 0 then
                 Citizen.Wait(chipDelay)
             end
-            PlaySoundFrontend(-1, sounds.rockChip.name, sounds.rockChip.soundset, true)
+            PlayMiningSound(sounds.rockChip.name, sounds.rockChip.soundset)
             
             if AtlasMiningConfig.DebugLogging then
                 print("^3[MINE SOUNDS]^7 Played sound sequence: Strike → Metal Hit → Rock Chip")
