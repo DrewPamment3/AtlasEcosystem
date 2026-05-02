@@ -10,6 +10,62 @@ local hastool = false
 -- Startup debug
 print("^2[ATLAS MINING CLIENT]^7 Client script loaded. Waiting 5s before playerLoaded trigger...")
 
+-- Audio Bank Loading
+local audioLoaded = false
+
+local function LoadMiningAudioBanks()
+    if audioLoaded then return end
+    
+    print("^3[ATLAS MINING AUDIO]^7 Loading audio banks...")
+    
+    -- Load required soundsets for mining
+    RequestAmbientAudioBank("HUD_GOLD_MINING_SOUNDSET", false)
+    RequestAmbientAudioBank("OFF_MISSION_SOUNDSET", false)
+    
+    -- Wait for audio banks to load (RedM uses different natives than FiveM)
+    local timeout = GetGameTimer() + 5000
+    local hudLoaded, offLoaded = false, false
+    
+    while (not hudLoaded or not offLoaded) and GetGameTimer() < timeout do
+        -- Check if banks are loaded (try different methods for RedM compatibility)
+        local success1, result1 = pcall(function()
+            return HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET")
+        end)
+        
+        local success2, result2 = pcall(function()
+            return HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")
+        end)
+        
+        -- If the native calls work, use their results
+        if success1 then hudLoaded = result1 end
+        if success2 then offLoaded = result2 end
+        
+        -- If natives don't work, assume loaded after reasonable wait
+        if not success1 and not success2 and GetGameTimer() > (timeout - 3000) then
+            hudLoaded, offLoaded = true, true
+            print("^3[ATLAS MINING AUDIO]^7 Audio bank natives unavailable, assuming loaded")
+        end
+        
+        Citizen.Wait(100)
+    end
+    
+    if hudLoaded and offLoaded then
+        audioLoaded = true
+        print("^2[ATLAS MINING AUDIO]^7 Audio banks loaded successfully!")
+    else
+        print("^1[ATLAS MINING AUDIO]^7 Failed to load audio banks within timeout!")
+        -- For RedM compatibility, still mark as loaded to allow sound attempts
+        audioLoaded = true
+        print("^3[ATLAS MINING AUDIO]^7 Marking as loaded for RedM compatibility")
+    end
+end
+
+-- Load audio banks on script start
+Citizen.CreateThread(function()
+    Citizen.Wait(1000) -- Wait a moment for the game to be ready
+    LoadMiningAudioBanks()
+end)
+
 -- [[ UI ]]
 local function DrawMiningPrompt()
     local x, y = 0.5, 0.92
@@ -249,6 +305,56 @@ RegisterCommand('listrocks', function(source, args, rawCommand)
     print("^3Test:^7 /testspawn [model] - spawns rock in front of you")
 end)
 
+--- DEBUG: Check audio bank loading status (/checkaudio)
+RegisterCommand('checkaudio', function(source, args, rawCommand)
+    print("^2[Atlas Mining Audio]^7 Audio Bank Status:")
+    print("^3================================================^7")
+    print("^3Audio Loaded:^7 " .. tostring(audioLoaded))
+    
+    -- Try to check audio banks, handle missing natives gracefully
+    local hud_loaded, off_loaded = "Unknown", "Unknown"
+    
+    local success1, result1 = pcall(function()
+        return HasAmbientAudioBankLoaded("HUD_GOLD_MINING_SOUNDSET")
+    end)
+    if success1 then hud_loaded = tostring(result1) end
+    
+    local success2, result2 = pcall(function()
+        return HasAmbientAudioBankLoaded("OFF_MISSION_SOUNDSET")
+    end)
+    if success2 then off_loaded = tostring(result2) end
+    
+    print("^3HUD_GOLD_MINING_SOUNDSET:^7 " .. hud_loaded)
+    print("^3OFF_MISSION_SOUNDSET:^7 " .. off_loaded)
+    print("^3Sound Effects Enabled:^7 " .. tostring(AtlasMiningConfig.SoundEffects.enabled))
+    print("^3================================================^7")
+    
+    if audioLoaded then
+        print("^2✓ Audio system ready for mining sounds!^7")
+    else
+        print("^1✗ Audio system not ready. Use /reloadaudio to try again.^7")
+    end
+    
+    TriggerEvent('chat:addMessage', {
+        color = { 0, 255, 255 },
+        multiline = true,
+        args = { "Audio Status", "Audio loaded: " .. tostring(audioLoaded) .. " - Check console for details" }
+    })
+end)
+
+--- DEBUG: Reload audio banks (/reloadaudio)
+RegisterCommand('reloadaudio', function(source, args, rawCommand)
+    print("^3[Atlas Mining Audio]^7 Manually reloading audio banks...")
+    audioLoaded = false
+    LoadMiningAudioBanks()
+    
+    TriggerEvent('chat:addMessage', {
+        color = { 255, 165, 0 },
+        multiline = true,
+        args = { "Audio Reload", "Attempting to reload audio banks - check console" }
+    })
+end)
+
 --- DEBUG: Spawn any model in front of player for testing (/testspawn <modelName>)
 RegisterCommand('testspawn', function(source, args, rawCommand)
     if not args[1] then
@@ -337,6 +443,17 @@ RegisterCommand('testminingsounds', function(source, args, rawCommand)
         return
     end
 
+    if not audioLoaded then
+        print("^1[Atlas Mining Sounds]^7 Audio banks not loaded! Attempting to load...")
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 0, 0 },
+            multiline = true,
+            args = { "Mining Sounds", "Audio banks not loaded! Check console." }
+        })
+        LoadMiningAudioBanks()
+        return
+    end
+
     print("^2[Atlas Mining Sounds]^7 Testing mining sound sequence...")
     TriggerEvent('chat:addMessage', {
         color = { 0, 255, 0 },
@@ -372,6 +489,17 @@ RegisterCommand('testminingsound', function(source, args, rawCommand)
             multiline = true,
             args = { "Mining Sounds", "Usage: /testminingsound [pickaxeStrike|metalHit|rockChip|pebbleDrop]" }
         })
+        return
+    end
+
+    if not audioLoaded then
+        print("^1[Atlas Mining Sounds]^7 Audio banks not loaded! Attempting to load...")
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 0, 0 },
+            multiline = true,
+            args = { "Mining Sounds", "Audio banks not loaded! Check console." }
+        })
+        LoadMiningAudioBanks()
         return
     end
 
@@ -632,7 +760,7 @@ local function DoMiningHit()
     
     -- Create a separate thread for sound timing so it doesn't block the main flow
     Citizen.CreateThread(function()
-        if AtlasMiningConfig.SoundEffects.enabled then
+        if AtlasMiningConfig.SoundEffects.enabled and audioLoaded then
             local sounds = AtlasMiningConfig.SoundEffects.sounds
             local timing = AtlasMiningConfig.SoundEffects.timing
             
@@ -657,6 +785,8 @@ local function DoMiningHit()
             if AtlasMiningConfig.DebugLogging then
                 print("^3[MINE SOUNDS]^7 Played sound sequence: Strike → Metal Hit → Rock Chip")
             end
+        elseif AtlasMiningConfig.SoundEffects.enabled and not audioLoaded then
+            print("^1[MINE SOUNDS]^7 Audio banks not loaded! Cannot play mining sounds.")
         end
     end)
     
