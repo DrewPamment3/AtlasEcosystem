@@ -16,27 +16,57 @@ local function GetPlayerAxes(source)
     local axes = {}
     
     for axeName, axeData in pairs(Config.Axes) do
-        local success, item = pcall(function()
-            return exports.vorp_inventory:getItem(source, axeName)
+        -- Use getItemCount to check if player has this axe
+        local success, count = pcall(function()
+            return exports.vorp_inventory:getItemCount(source, axeName)
         end)
         
-        if success and item then
-            -- VORP inventory returns array of items (player can have multiple)
-            if type(item) == "table" and #item > 0 then
-                for _, axeItem in ipairs(item) do
-                    table.insert(axes, {
-                        name = axeName,
-                        tier = axeData.tier,
-                        power = axeData.power,
-                        durability = axeItem.metadata and axeItem.metadata.durability or 100, -- Default 100 if no metadata
-                        slot = axeItem.slot,
-                        id = axeItem.id -- Unique item ID for removal
-                    })
+        if success and count and count > 0 then
+            print("^2[GET AXES]^7 Player " .. source .. " has " .. count .. "x " .. axeName)
+            
+            -- Get the actual item data for durability info
+            local itemSuccess, item = pcall(function()
+                return exports.vorp_inventory:getItem(source, axeName)
+            end)
+            
+            if itemSuccess and item and type(item) == "table" then
+                -- Handle both single item and array of items
+                local itemsArray = item
+                if not item[1] then -- Single item, not array
+                    itemsArray = {item}
                 end
+                
+                for _, axeItem in ipairs(itemsArray) do
+                    if axeItem then
+                        table.insert(axes, {
+                            name = axeName,
+                            tier = axeData.tier,
+                            power = axeData.power,
+                            durability = axeItem.metadata and axeItem.metadata.durability or 100, -- Default 100 if no metadata
+                            slot = axeItem.slot or 0,
+                            id = axeItem.id or 0 -- Unique item ID for removal
+                        })
+                        print("^2[GET AXES]^7 Added " .. axeName .. " tier " .. axeData.tier .. " durability " .. (axeItem.metadata and axeItem.metadata.durability or 100))
+                    end
+                end
+            else
+                -- Fallback: create a basic axe entry even if we can't get detailed info
+                print("^3[GET AXES]^7 Could not get detailed info for " .. axeName .. ", using fallback")
+                table.insert(axes, {
+                    name = axeName,
+                    tier = axeData.tier,
+                    power = axeData.power,
+                    durability = 100, -- Default durability
+                    slot = 0,
+                    id = 0
+                })
             end
+        else
+            print("^3[GET AXES]^7 Player " .. source .. " does not have " .. axeName .. " (count: " .. tostring(count) .. ")")
         end
     end
     
+    print("^2[GET AXES]^7 Player " .. source .. " total axes found: " .. #axes)
     return axes
 end
 
