@@ -250,6 +250,7 @@ local function RequestValidation(forestId)
     end
     
     LastValidationRequest = currentTime
+    print("^3[CLIENT VALIDATION]^7 Requesting validation for forest " .. forestId)
     TriggerServerEvent('atlas_woodcutting:server:requestValidation', forestId)
     return true
 end
@@ -257,6 +258,7 @@ end
 -- Event to receive validation results from server
 RegisterNetEvent('atlas_woodcutting:client:validationResult')
 AddEventHandler('atlas_woodcutting:client:validationResult', function(forestId, promptText, isDisabled)
+    print("^3[CLIENT VALIDATION]^7 Received validation result for forest " .. forestId .. ": '" .. promptText .. "' (disabled: " .. tostring(isDisabled) .. ")")
     ValidationCache[forestId] = {
         promptText = promptText,
         isDisabled = isDisabled,

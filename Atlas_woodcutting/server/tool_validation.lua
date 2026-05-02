@@ -90,8 +90,10 @@ local function CheckLevelRequirement(source, groveTier)
     return true, nil
 end
 
--- Main tool validation function
+-- Main tool validation function (global)
 function ValidateWoodcuttingTools(source, groveTier)
+    print("^2[VALIDATE TOOLS]^7 ValidateWoodcuttingTools called for player " .. source .. " grove tier " .. groveTier)
+    
     local result = {
         hasValidTool = false,
         bestTool = nil,
@@ -103,6 +105,7 @@ function ValidateWoodcuttingTools(source, groveTier)
     
     -- Debug mode - bypass all requirements
     if Config.DebugLogging then
+        print("^2[VALIDATE TOOLS]^7 Debug mode enabled - bypassing all requirements")
         result.hasValidTool = true
         result.levelValid = true
         result.bestTool = { name = "debug_axe", tier = 5, durability = 100, power = 3.0 }
@@ -149,7 +152,7 @@ function ValidateWoodcuttingTools(source, groveTier)
     return result
 end
 
--- Handle tool durability reduction and breaking
+-- Handle tool durability reduction and breaking (global)
 function HandleAxeDurability(source, toolData)
     if Config.DebugLogging then
         print("^3[TOOL DURABILITY]^7 Debug mode - skipping durability handling")
@@ -213,7 +216,7 @@ function HandleAxeDurability(source, toolData)
     end
 end
 
--- Get prompt text based on validation result
+-- Get prompt text based on validation result (global)
 function GetWoodcuttingPromptText(validationResult)
     if validationResult.hasValidTool and validationResult.levelValid then
         return "CHOP TREE", false -- Text, isDisabled
@@ -225,10 +228,5 @@ function GetWoodcuttingPromptText(validationResult)
         return "CHOP TREE (Error)", true
     end
 end
-
--- Export functions for use in main.lua
-_G.ValidateWoodcuttingTools = ValidateWoodcuttingTools
-_G.HandleAxeDurability = HandleAxeDurability
-_G.GetWoodcuttingPromptText = GetWoodcuttingPromptText
 
 print("^2[Atlas Woodcutting]^7 Tool validation system loaded")

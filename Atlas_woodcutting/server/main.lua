@@ -1238,18 +1238,24 @@ end)
 RegisterServerEvent('atlas_woodcutting:server:requestValidation')
 AddEventHandler('atlas_woodcutting:server:requestValidation', function(forestId)
     local _source = source
+    print("^3[SERVER VALIDATION]^7 Received validation request from player " .. _source .. " for forest " .. forestId)
     
     -- Get forest info for validation
     local forest = GetForestById(forestId)
     if not forest then
+        print("^1[SERVER VALIDATION]^7 Forest " .. forestId .. " not found!")
         -- Send error response
         TriggerClientEvent('atlas_woodcutting:client:validationResult', _source, forestId, "CHOP TREE (Error)", true)
         return
     end
     
+    print("^3[SERVER VALIDATION]^7 Forest " .. forestId .. " found, tier " .. forest.tier .. ". Validating tools...")
+    
     -- Validate tools and level for this forest tier
     local validation = ValidateWoodcuttingTools(_source, forest.tier)
     local promptText, isDisabled = GetWoodcuttingPromptText(validation)
+    
+    print("^3[SERVER VALIDATION]^7 Validation result: '" .. promptText .. "' (disabled: " .. tostring(isDisabled) .. ")")
     
     -- Send validation result to client
     TriggerClientEvent('atlas_woodcutting:client:validationResult', _source, forestId, promptText, isDisabled)
