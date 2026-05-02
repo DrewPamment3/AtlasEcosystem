@@ -3,8 +3,9 @@ AtlasWoodConfig = {}
 -- Interaction & Rewards
 AtlasWoodConfig.ChopXPReward = 20           -- DEPRECATED: Old flat XP reward (kept for compatibility)
 AtlasWoodConfig.InteractionKey = 0x760A9C6F -- G key (0x760A9C6F)
-AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation
-AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds
+AtlasWoodConfig.ChopAnimationTime = 5000    -- Milliseconds for chop animation (DEPRECATED - now uses Hits system)
+AtlasWoodConfig.MinChopTime = 5000          -- 5 Seconds (DEPRECATED)
+AtlasWoodConfig.HitsRequired = 4            -- Fixed number of swings to chop a tree
 
 -- New tiered XP system
 AtlasWoodConfig.XPSystem = {

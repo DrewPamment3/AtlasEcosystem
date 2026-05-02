@@ -785,8 +785,8 @@ AddEventHandler('atlas_woodcutting:client:beginMinigame', function(token)
     -- Equip the axe tool (like VORP lumberjack)
     EquipTool(GetHashKey('p_axe02x'))
     
-    -- Simulate the swinging system from VORP lumberjack
-    local swingcount = math.random(3, 8) -- Random number of swings needed
+    -- Use fixed number of swings from config
+    local swingcount = AtlasWoodConfig.HitsRequired or 4
     
     -- Enhanced interruption monitoring thread
     local lastSwingTime = 0

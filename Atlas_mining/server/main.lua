@@ -277,10 +277,23 @@ local function ProcessMiningLoot(source, campTier)
         return false
     end
 
-    -- Roll for primary loot
+    -- Roll for primary loot (ore)
     local primaryLoot = AtlasMiningConfig.RollForLoot(weights, totalWeight)
     if primaryLoot then
         AwardLoot(source, primaryLoot, 1, false)
+    end
+
+    -- Gem drop system (separate roll, independent of ore)
+    local gemDropped = false
+    if primaryLoot then
+        local gemResult = AtlasMiningConfig.RollForGem(pickaxeTier, playerLevel)
+        if gemResult then
+            AwardLoot(source, gemResult, 1, false)
+            gemDropped = true
+            if Config.DebugLogging then
+                print("^5[GEM DROP]^7 Player " .. source .. " found a " .. gemResult .. "! (Pickaxe Tier: " .. pickaxeTier .. ")")
+            end
+        end
     end
 
     -- Calculate bonus loot chance
@@ -306,7 +319,7 @@ local function ProcessMiningLoot(source, campTier)
     end
 
     -- Return whether bonus loot was awarded (for XP calculation)
-    return hasBonusLoot
+    return hasBonusLoot, gemDropped
 end
 
 -- Helper: Subscribe player to nearby camps
@@ -490,8 +503,8 @@ AddEventHandler('atlas_mining:server:requestStart', function(coords, campId, roc
     print("^2[MINE FLOW]^7 requestStart [SERVER] - Player " ..
     _source .. " | Camp " .. campId .. " | Rock " .. rockIndex)
 
-    -- Generate random number of hits required (like woodcutting)
-    local hitsRequired = math.random(Config.MinHitsRequired, Config.MaxHitsRequired)
+    -- Use fixed number of hits from config (always 4 swings)
+    local hitsRequired = Config.HitsRequired or 4
     
     local token = "MINE_" .. math.random(1000, 9999)
     ActiveTasks[_source] = {
@@ -914,6 +927,16 @@ RegisterCommand('testmineloot', function(source, args)
     local bonusChance = AtlasMiningConfig.CalculateBonusChance(playerLevel, pickaxeTier)
     print("^2[LOOT TEST]^7 Bonus Loot Chance: " .. string.format("%.1f%%", bonusChance))
 
+    -- Gem system info
+    local gemChance = AtlasMiningConfig.CalculateGemChance(pickaxeTier)
+    print("^5[GEM TEST]^7 Gem Drop Chance: " .. string.format("%.1f%%", gemChance) .. " (Base: 3% + Pickaxe: " .. (gemChance - 3.0) .. "%)")
+    print("^5[GEM TEST]^7 Available gems at level " .. playerLevel .. ":")
+    for _, gem in ipairs(AtlasMiningConfig.GemSystem.gems) do
+        local unlocked = playerLevel >= gem.minLevel
+        local marker = unlocked and "^2✓^7" or "^1✗^7"
+        print("^5  " .. marker .. " " .. gem.name .. " (weight: " .. gem.weight .. ", req lvl: " .. gem.minLevel .. ")")
+    end
+
     -- Calculate XP rewards
     local baseXP = AtlasMiningConfig.CalculateXPReward(campTier, pickaxeTier, false)
     local bonusXP = AtlasMiningConfig.CalculateXPReward(campTier, pickaxeTier, true)
@@ -927,7 +950,14 @@ RegisterCommand('testmineloot', function(source, args)
         local result = AtlasMiningConfig.RollForLoot(weights, totalWeight)
         local bonusRoll = math.random() * 100
         local bonusResult = ""
+        local gemResult = ""
         local xpAmount = baseXP
+
+        -- Gem roll
+        local gem = AtlasMiningConfig.RollForGem(pickaxeTier, playerLevel)
+        if gem then
+            gemResult = " ~y~[GEM: " .. gem .. "]~7"
+        end
 
         if bonusRoll <= bonusChance then
             local bonusWeights, bonusTotalWeight = AtlasMiningConfig.CalculateLootWeights(playerLevel, campTier, pickaxeTier, true)
@@ -938,7 +968,7 @@ RegisterCommand('testmineloot', function(source, args)
             end
         end
 
-        print("^3  Roll " .. i .. ":^7 " .. (result or "NONE") .. bonusResult .. " | XP: " .. xpAmount)
+        print("^3  Roll " .. i .. ":^7 " .. (result or "NONE") .. bonusResult .. gemResult .. " | XP: " .. xpAmount)
     end
 
     VORPcore.NotifyRightTip(_source, "~g~Loot & XP test complete - check console", 3000)
@@ -1095,7 +1125,7 @@ RegisterCommand('simulatemineloot', function(source, args)
     print("^2[LOOT SIMULATE]^7 Simulating complete mining experience for player " .. _source .. " in tier " .. campTier .. " camp")
 
     -- Process loot and get bonus status
-    local hasBonusLoot = ProcessMiningLoot(_source, campTier)
+    local hasBonusLoot, gemDropped = ProcessMiningLoot(_source, campTier)
 
     -- Get player's pickaxe tier and calculate XP
     local pickaxeTier = GetPlayerPickaxeTier(_source)
@@ -1103,9 +1133,10 @@ RegisterCommand('simulatemineloot', function(source, args)
 
     -- Simulate XP award
     local bonusText = hasBonusLoot and " (DOUBLE XP for bonus loot!)" or ""
-    print("^2[LOOT SIMULATE]^7 Would award " .. xpReward .. " XP" .. bonusText)
+    local gemText = gemDropped and " ~y~+ Gem found!" or ""
+    print("^2[LOOT SIMULATE]^7 Would award " .. xpReward .. " XP" .. bonusText .. (gemDropped and " + Gem!" or ""))
 
-    VORPcore.NotifyRightTip(_source, "~g~Simulation complete: " .. xpReward .. " XP" .. (hasBonusLoot and " (BONUS!)" or ""), 4000)
+    VORPcore.NotifyRightTip(_source, "~g~Simulation complete: " .. xpReward .. " XP" .. (hasBonusLoot and " (BONUS!)" or "") .. gemText, 5000)
 end)
 
 -- =============================================
