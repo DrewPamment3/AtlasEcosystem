@@ -8,6 +8,10 @@ local ValidationCache = {} -- Cache validation results to avoid spamming server
 local LastValidationRequest = 0 -- Prevent spamming validation requests
 local CurrentPromptState = { text = "MINE ROCK", disabled = false } -- Current prompt state
 
+-- Interaction throttling to prevent G-key spam
+local LastInteractionTime = 0
+local InteractionCooldown = 1000 -- 1 second cooldown between interactions
+
 -- Pickaxe prop state (vorp_mining animation logic)
 local tool = nil
 local hastool = false
@@ -355,10 +359,23 @@ Citizen.CreateThread(function()
                 
                 DrawMiningPrompt(CurrentPromptState.text, CurrentPromptState.disabled)
                 
-                -- Only allow interaction if not disabled and not busy
+                -- Only allow interaction if not disabled, not busy, and not on cooldown
                 if IsControlJustPressed(0, AtlasMiningConfig.InteractionKey) and not isBusy and not CurrentPromptState.disabled then
+                    local currentTime = GetGameTimer()
+                    
+                    -- Check interaction cooldown to prevent G-key spam
+                    if currentTime - LastInteractionTime < InteractionCooldown then
+                        print("^3[Mine Debug]^7 G key pressed but on cooldown (" .. (InteractionCooldown - (currentTime - LastInteractionTime)) .. "ms remaining)")
+                        return
+                    end
+                    
                     print("^2[Mine Debug]^7 SUCCESS: Interaction for Camp " ..
                         matchedNode.campId .. " | Rock " .. matchedNode.rockIndex)
+                    
+                    -- Set interaction time and busy state immediately
+                    LastInteractionTime = currentTime
+                    isBusy = true  -- Set busy immediately to prevent double requests
+                    
                     TriggerServerEvent('atlas_mining:server:requestStart', entCoords, matchedNode.campId,
                         matchedNode.rockIndex, {
                             x = matchedNode.coords.x,

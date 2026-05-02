@@ -8,6 +8,10 @@ local ValidationCache = {} -- Cache validation results to avoid spamming server
 local LastValidationRequest = 0 -- Prevent spamming validation requests
 local CurrentPromptState = { text = "CHOP TREE", disabled = false } -- Current prompt state
 
+-- Interaction throttling to prevent G-key spam
+local LastInteractionTime = 0
+local InteractionCooldown = 1000 -- 1 second cooldown between interactions
+
 -- VORP Lumberjack-style animation variables
 local tool, hastool = nil, false
 local swing = 0
@@ -316,11 +320,23 @@ Citizen.CreateThread(function()
                 
                 DrawWoodcuttingPrompt(CurrentPromptState.text, CurrentPromptState.disabled)
                 
-                -- Only allow interaction if not disabled and not busy
+                -- Only allow interaction if not disabled, not busy, and not on cooldown
                 if IsControlJustPressed(0, AtlasWoodConfig.InteractionKey) and not isBusy and not CurrentPromptState.disabled then
+                    local currentTime = GetGameTimer()
+                    
+                    -- Check interaction cooldown to prevent G-key spam
+                    if currentTime - LastInteractionTime < InteractionCooldown then
+                        print("^3[INTERACTION DEBUG]^7 G key pressed but on cooldown (" .. (InteractionCooldown - (currentTime - LastInteractionTime)) .. "ms remaining)")
+                        return
+                    end
+                    
                     print("^2[INTERACTION DEBUG]^7 G key pressed! Starting chop request")
                     print("^2[INTERACTION DEBUG]^7 Forest: " ..
                     matchedNode.forestId .. " | Tree: " .. matchedNode.treeIndex)
+                    
+                    -- Set interaction time and busy state immediately
+                    LastInteractionTime = currentTime
+                    isBusy = true  -- Set busy immediately to prevent double requests
 
                     TriggerServerEvent('atlas_woodcutting:server:requestStart', entCoords, matchedNode.forestId,
                         matchedNode.treeIndex, {

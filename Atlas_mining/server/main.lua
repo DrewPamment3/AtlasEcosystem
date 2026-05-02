@@ -15,6 +15,261 @@ local CampClients = {}    -- Track which players see which camps: {campId = {pla
 local CampRockStates = {} -- Track depleted rocks: {campId = {rockIndex = mineTime, ...}}
 local RespawnTimers = {}  -- Track respawn timers: {campId_rockIndex = timerId}
 
+-- ============================================================
+-- TOOL VALIDATION FUNCTIONS (Embedded to avoid scope issues)
+-- ============================================================
+
+-- Get all pickaxes from player inventory with their durability and slot info
+local function GetPlayerPickaxes(source)
+    local pickaxes = {}
+    
+    for pickaxeName, pickaxeData in pairs(Config.Pickaxes) do
+        print("^3[GET PICKAXES DEBUG]^7 Checking for pickaxe: " .. pickaxeName)
+        
+        -- Try to get the item directly (this seems to work better with VORP inventory)
+        local success, item = pcall(function()
+            return exports.vorp_inventory:getItem(source, pickaxeName)
+        end)
+        
+        if success and item then
+            print("^2[GET PICKAXES]^7 Player " .. source .. " has " .. pickaxeName .. ": " .. tostring(item))
+            
+            -- Handle different return formats from VORP inventory
+            local hasItem = false
+            local itemData = nil
+            
+            if type(item) == "table" then
+                if item.count and item.count > 0 then
+                    -- Single item with count property
+                    hasItem = true
+                    itemData = item
+                elseif #item > 0 then
+                    -- Array of items
+                    hasItem = true
+                    itemData = item[1] -- Use first item
+                end
+            elseif type(item) == "number" and item > 0 then
+                -- Just a count
+                hasItem = true
+                itemData = { count = item }
+            end
+            
+            if hasItem then
+                print("^2[GET PICKAXES]^7 Player " .. source .. " confirmed to have " .. pickaxeName)
+                
+                local durability = 100 -- Default durability
+                if itemData and itemData.metadata and itemData.metadata.durability then
+                    durability = itemData.metadata.durability
+                end
+                
+                table.insert(pickaxes, {
+                    name = pickaxeName,
+                    tier = pickaxeData.tier,
+                    power = pickaxeData.power,
+                    durability = durability,
+                    slot = itemData and itemData.slot or 0,
+                    id = itemData and itemData.id or 0,
+                    metadata = itemData and itemData.metadata or {}
+                })
+                print("^2[GET PICKAXES]^7 Added " .. pickaxeName .. " tier " .. pickaxeData.tier .. " durability " .. durability)
+            else
+                print("^3[GET PICKAXES]^7 Player " .. source .. " has " .. pickaxeName .. " but count is 0 or invalid")
+            end
+        else
+            print("^3[GET PICKAXES]^7 Player " .. source .. " does not have " .. pickaxeName .. " (error or not found)")
+        end
+    end
+    
+    print("^2[GET PICKAXES]^7 Player " .. source .. " total pickaxes found: " .. #pickaxes)
+    return pickaxes
+end
+
+-- Find the best (highest tier) pickaxe available
+local function GetBestPickaxe(pickaxes)
+    if #pickaxes == 0 then return nil end
+    
+    -- Sort by tier (highest first), then by durability (highest first)
+    table.sort(pickaxes, function(a, b)
+        if a.tier == b.tier then
+            return a.durability > b.durability -- Same tier = prefer higher durability
+        end
+        return a.tier > b.tier -- Higher tier = better
+    end)
+    
+    return pickaxes[1] -- Return best pickaxe
+end
+
+-- Check if player meets level requirement for camp tier
+local function CheckLevelRequirement(source, campTier)
+    -- Debug mode bypass
+    if Config.DebugLogging then
+        print("^3[TOOL VALIDATION]^7 Debug mode enabled - bypassing level requirements")
+        return true, nil
+    end
+    
+    local requiredLevel = Config.CampUnlocks[campTier]
+    if not requiredLevel then
+        return true, nil -- No level requirement
+    end
+    
+    -- Get player's mining level using sync method
+    local success, playerLevel = pcall(function()
+        return exports['Atlas_skilling']:GetSkillLevelSync(source, 'mining')
+    end)
+    
+    if not success or not playerLevel then
+        print("^1[TOOL VALIDATION]^7 Failed to get player mining level")
+        return false, "Unable to check your mining level"
+    end
+    
+    if playerLevel < requiredLevel then
+        return false, requiredLevel
+    end
+    
+    return true, nil
+end
+
+-- Main tool validation function
+function ValidateMiningTools(source, campTier)
+    print("^2[VALIDATE TOOLS]^7 ValidateMiningTools called for player " .. source .. " camp tier " .. campTier)
+    
+    local result = {
+        hasValidTool = false,
+        bestTool = nil,
+        levelValid = false,
+        requiredLevel = nil,
+        errorMessage = nil,
+        willBreak = false
+    }
+    
+    -- Debug mode - bypass all requirements
+    if Config.DebugLogging then
+        print("^2[VALIDATE TOOLS]^7 Debug mode enabled - bypassing all requirements")
+        result.hasValidTool = true
+        result.levelValid = true
+        result.bestTool = { name = "debug_pickaxe", tier = 5, durability = 100, power = 3.0 }
+        return result
+    end
+    
+    -- Step 1: Check level requirements
+    local levelValid, requiredLevel = CheckLevelRequirement(source, campTier)
+    result.levelValid = levelValid
+    result.requiredLevel = requiredLevel
+    
+    if not levelValid then
+        if type(requiredLevel) == "number" then
+            result.errorMessage = "Requires Mining Level " .. requiredLevel
+        else
+            result.errorMessage = requiredLevel -- Error message string
+        end
+        return result
+    end
+    
+    -- Step 2: Get player's pickaxes
+    local pickaxes = GetPlayerPickaxes(source)
+    
+    if #pickaxes == 0 then
+        result.errorMessage = "Requires Pickaxe (Crude or better)"
+        return result
+    end
+    
+    -- Step 3: Find best pickaxe
+    local bestPickaxe = GetBestPickaxe(pickaxes)
+    
+    if not bestPickaxe then
+        result.errorMessage = "No usable pickaxe found"
+        return result
+    end
+    
+    -- Step 4: Check if tool will break after this action
+    result.willBreak = (bestPickaxe.durability <= 5)
+    
+    -- Step 5: Success!
+    result.hasValidTool = true
+    result.bestTool = bestPickaxe
+    
+    return result
+end
+
+-- Handle tool durability reduction and breaking
+function HandlePickaxeDurability(source, toolData)
+    if Config.DebugLogging then
+        print("^3[TOOL DURABILITY]^7 Debug mode - skipping durability handling")
+        return true
+    end
+    
+    local newDurability = toolData.durability - 5
+    
+    if newDurability <= 0 then
+        -- Tool breaks - replace with broken version
+        local brokenName = "broken_" .. toolData.name
+        
+        -- Remove original tool
+        local success1 = pcall(function()
+            exports.vorp_inventory:subItem(source, toolData.name, 1, toolData.metadata or {})
+        end)
+        
+        if not success1 then
+            print("^1[TOOL DURABILITY]^7 Failed to remove broken tool: " .. toolData.name)
+            return false
+        end
+        
+        -- Add broken version
+        local success2 = pcall(function()
+            exports.vorp_inventory:addItem(source, brokenName, 1, { durability = 0 })
+        end)
+        
+        if not success2 then
+            print("^1[TOOL DURABILITY]^7 Failed to add broken tool: " .. brokenName)
+            -- Try to give back original tool to prevent item loss
+            pcall(function()
+                exports.vorp_inventory:addItem(source, toolData.name, 1, { durability = 1 })
+            end)
+            return false
+        end
+        
+        -- Notify player
+        local User = VORPcore.getUser(source)
+        if User then
+            VORPcore.NotifyRightTip(source, "~r~Your " .. toolData.name:gsub("_", " ") .. " has broken!", 4000)
+        end
+        
+        print("^3[TOOL DURABILITY]^7 Tool broken: " .. toolData.name .. " -> " .. brokenName)
+        return true
+        
+    else
+        -- Reduce durability
+        local success = pcall(function()
+            -- Update the existing item's durability
+            exports.vorp_inventory:subItem(source, toolData.name, 1, toolData.metadata or {})
+            exports.vorp_inventory:addItem(source, toolData.name, 1, { durability = newDurability })
+        end)
+        
+        if success then
+            print("^3[TOOL DURABILITY]^7 " .. toolData.name .. " durability: " .. toolData.durability .. " -> " .. newDurability)
+            return true
+        else
+            print("^1[TOOL DURABILITY]^7 Failed to update durability for: " .. toolData.name)
+            return false
+        end
+    end
+end
+
+-- Get prompt text based on validation result
+function GetMiningPromptText(validationResult)
+    if validationResult.hasValidTool and validationResult.levelValid then
+        return "MINE ROCK", false -- Text, isDisabled
+    elseif not validationResult.levelValid then
+        return "MINE ROCK (Requires Level " .. (validationResult.requiredLevel or "?") .. ")", true
+    elseif not validationResult.hasValidTool then
+        return "MINE ROCK (Requires Pickaxe)", true
+    else
+        return "MINE ROCK (Error)", true
+    end
+end
+
+print("^2[Atlas Mining]^7 Tool validation functions embedded in main.lua")
+
 -- =============================================
 -- DATABASE INITIALIZATION
 -- =============================================
@@ -536,6 +791,12 @@ AddEventHandler('atlas_mining:server:requestStart', function(coords, campId, roc
     end
     
     local campTier = camp.tier
+    
+    -- Check if player already has an active task to prevent duplicates
+    if ActiveTasks[_source] then
+        print("^3[MINE FLOW]^7 Player " .. _source .. " already has active task - ignoring duplicate request")
+        return
+    end
     
     -- NEW: Comprehensive tool and level validation
     local validation = ValidateMiningTools(_source, campTier)

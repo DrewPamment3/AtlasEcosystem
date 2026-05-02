@@ -1535,6 +1535,12 @@ AddEventHandler('atlas_woodcutting:server:requestStart', function(coords, forest
     
     local groveTier = forest.tier
     
+    -- Check if player already has an active task to prevent duplicates
+    if ActiveTasks[_source] then
+        print("^3[CHOP FLOW]^7 Player " .. _source .. " already has active task - ignoring duplicate request")
+        return
+    end
+
     -- NEW: Comprehensive tool and level validation
     local validation = ValidateWoodcuttingTools(_source, groveTier)
     
