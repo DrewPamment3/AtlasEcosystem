@@ -19,26 +19,24 @@ local function LoadMiningAudioBanks()
     print("^3[ATLAS MINING AUDIO]^7 Loading audio banks for RedM...")
     
     local banks = {"HUD_GOLD_MINING_SOUNDSET", "OFF_MISSION_SOUNDSET"}
+    local allLoaded = true
     
     for _, bank in ipairs(banks) do
-        if not HasAmbientAudioBankLoaded(bank) then
+        local success = pcall(function()
             RequestAmbientAudioBank(bank)
-            
-            local timeout = 0
-            while not HasAmbientAudioBankLoaded(bank) and timeout < 50 do
-                Citizen.Wait(100)
-                timeout = timeout + 1
-            end
-            
-            if HasAmbientAudioBankLoaded(bank) then
-                print("^2[ATLAS MINING AUDIO]^7 Loaded: " .. bank)
-            else
-                print("^1[ATLAS MINING AUDIO]^7 Failed to load: " .. bank)
-            end
+        end)
+        
+        if success then
+            print("^2[ATLAS MINING AUDIO]^7 Requested: " .. bank)
         else
-            print("^2[ATLAS MINING AUDIO]^7 Already loaded: " .. bank)
+            print("^1[ATLAS MINING AUDIO]^7 Failed to request: " .. bank)
+            allLoaded = false
         end
     end
+    
+    -- Wait for banks to load (RedM loads asynchronously)
+    print("^3[ATLAS MINING AUDIO]^7 Waiting for audio banks to load...")
+    Citizen.Wait(3000) -- Give RedM time to load the banks
     
     audioLoaded = true
     print("^2[ATLAS MINING AUDIO]^7 Audio system ready!")
