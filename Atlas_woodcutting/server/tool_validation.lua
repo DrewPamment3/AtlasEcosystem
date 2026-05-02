@@ -229,4 +229,13 @@ function GetWoodcuttingPromptText(validationResult)
     end
 end
 
+-- Ensure functions are globally accessible
+_G.ValidateWoodcuttingTools = ValidateWoodcuttingTools
+_G.HandleAxeDurability = HandleAxeDurability  
+_G.GetWoodcuttingPromptText = GetWoodcuttingPromptText
+
 print("^2[Atlas Woodcutting]^7 Tool validation system loaded")
+print("^2[Atlas Woodcutting]^7 Global functions registered:")
+print("^2[Atlas Woodcutting]^7 - ValidateWoodcuttingTools: " .. tostring(_G.ValidateWoodcuttingTools))
+print("^2[Atlas Woodcutting]^7 - HandleAxeDurability: " .. tostring(_G.HandleAxeDurability))
+print("^2[Atlas Woodcutting]^7 - GetWoodcuttingPromptText: " .. tostring(_G.GetWoodcuttingPromptText))
