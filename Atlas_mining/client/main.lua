@@ -2,6 +2,7 @@ local isBusy = false
 local CampRegistry = {}    -- {campId, rockIndex, coords, entity (rock or mined), isDepleted}
 local RenderedCamps = {}   -- Camps currently being rendered
 local MinedRockMap = {}    -- Map of rockIndex -> depleted rock entity for quick lookup
+local miningStartCoords = nil -- Snap-back reference to counter animation root motion
 
 -- Pickaxe prop state (vorp_mining animation logic)
 local tool = nil
@@ -573,6 +574,12 @@ local function DoMiningHit()
     -- Clear animation
     ClearPedTasks(ped)
     
+    -- Snap back to start position to counter animation root motion
+    -- (pre_swing_trans_after_swing includes a forward step baked into the animation)
+    if miningStartCoords then
+        SetEntityCoords(ped, miningStartCoords.x, miningStartCoords.y, miningStartCoords.z, false, false, false, false)
+    end
+    
     -- Increment progress
     miningProgress.hitsCompleted = miningProgress.hitsCompleted + 1
     
@@ -588,37 +595,97 @@ AddEventHandler('atlas_mining:client:beginMining', function(token, hitsRequired)
     -- Initialize progress system
     miningProgress.active = true
     miningProgress.token = token
-    miningProgress.hitsRequired = hitsRequired or math.random(3, 7) -- Fallback random hits
+    miningProgress.hitsRequired = hitsRequired or AtlasMiningConfig.HitsRequired or 4
     miningProgress.hitsCompleted = 0
+
+    local playerPed = PlayerPedId()
+    miningStartCoords = GetEntityCoords(playerPed)
+    local startHealth = GetEntityHealth(playerPed)
+    local interrupted = false
+    local interruptionReason = nil
 
     -- Equip pickaxe with vorp_mining animation style
     local pickaxeHash = GetHashKey(AtlasMiningConfig.PickaxePropModel)
     EquipPickaxe(pickaxeHash)
 
+    -- Load interruption config (with safe defaults)
+    local interruptionConfig = AtlasMiningConfig.Interruption or {}
+    local maxDist = interruptionConfig.maxMovementDistance or 1.0
+    local checkInterval = interruptionConfig.checkInterval or 50
+    local healthCheck = interruptionConfig.healthCheckEnabled ~= false
+
+    -- Interruption monitoring thread (runs alongside the mining loop)
+    Citizen.CreateThread(function()
+        while miningProgress.active and not interrupted do
+            local currentHealth = GetEntityHealth(playerPed)
+
+            -- 1. HEALTH/DAMAGE DETECTION
+            if healthCheck and currentHealth < startHealth then
+                interrupted = true
+                interruptionReason = "Player took damage"
+                break
+            end
+
+            -- 2. DEATH/DYING DETECTION
+            if IsPedDeadOrDying(playerPed, false) then
+                interrupted = true
+                interruptionReason = "Player died or is dying"
+                break
+            end
+
+            -- 3. RAGDOLL DETECTION
+            if IsPedRagdoll(playerPed) then
+                interrupted = true
+                interruptionReason = "Player ragdolled"
+                break
+            end
+
+            -- 4. COMBAT DETECTION
+            if IsPedInCombat(playerPed, 0) then
+                interrupted = true
+                interruptionReason = "Player entered combat"
+                break
+            end
+
+            -- 5. POSITION CHANGE DETECTION
+            -- (DoMiningHit snaps back after each swing, so if the player held WASD
+            --  they'll drift from startCoords before the next snap-back)
+            local currentCoords = GetEntityCoords(playerPed)
+            local distance = #(miningStartCoords - currentCoords)
+            if distance > maxDist then
+                interrupted = true
+                interruptionReason = "Player moved " .. string.format("%.1fm", distance) .. " from start"
+                break
+            end
+
+            Wait(checkInterval)
+        end
+    end)
+
     -- Mining loop with progress
     Citizen.CreateThread(function()
-        while miningProgress.active and miningProgress.hitsCompleted < miningProgress.hitsRequired do
+        while miningProgress.active and not interrupted and miningProgress.hitsCompleted < miningProgress.hitsRequired do
             DoMiningHit()
-            
-            -- Small delay between hits
-            if miningProgress.hitsCompleted < miningProgress.hitsRequired then
+
+            -- Small delay between hits (only if more hits remain and not interrupted)
+            if miningProgress.hitsCompleted < miningProgress.hitsRequired and not interrupted then
                 Citizen.Wait(500)
             end
         end
-        
-        -- Mining complete
-        if miningProgress.active then
-            print("^2[MINE FLOW]^7 Mining complete! Clearing tasks and removing pickaxe")
-            ClearPedTasks(PlayerPedId())
-            RemovePickaxeFromPlayer()
-            
-            -- Reset progress
-            miningProgress.active = false
-            
-            print("^2[MINE FLOW]^7 Setting isBusy = false, sending finishMine to server")
+
+        -- Cleanup (runs whether completed or interrupted)
+        ClearPedTasks(playerPed)
+        RemovePickaxeFromPlayer()
+        miningProgress.active = false
+        miningStartCoords = nil
+
+        if interrupted then
+            print("^1[MINE FLOW]^7 Mining interrupted! Reason: " .. (interruptionReason or "unknown"))
+            isBusy = false
+        else
+            print("^2[MINE FLOW]^7 Mining complete! Sending finishMine to server")
             isBusy = false
             TriggerServerEvent('atlas_mining:server:finishMine', miningProgress.token)
-            print("^2[MINE FLOW]^7 finishMine event sent")
         end
     end)
 end)
