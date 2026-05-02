@@ -16,53 +16,59 @@ local function GetPlayerAxes(source)
     local axes = {}
     
     for axeName, axeData in pairs(Config.Axes) do
-        -- Use getItemCount to check if player has this axe
-        local success, count = pcall(function()
-            return exports.vorp_inventory:getItemCount(source, axeName)
+        print("^3[GET AXES DEBUG]^7 Checking for axe: " .. axeName)
+        
+        -- Try to get the item directly (this seems to work better with VORP inventory)
+        local success, item = pcall(function()
+            return exports.vorp_inventory:getItem(source, axeName)
         end)
         
-        if success and count and count > 0 then
-            print("^2[GET AXES]^7 Player " .. source .. " has " .. count .. "x " .. axeName)
+        if success and item then
+            print("^2[GET AXES]^7 Player " .. source .. " has " .. axeName .. ": " .. tostring(item))
             
-            -- Get the actual item data for durability info
-            local itemSuccess, item = pcall(function()
-                return exports.vorp_inventory:getItem(source, axeName)
-            end)
+            -- Handle different return formats from VORP inventory
+            local hasItem = false
+            local itemData = nil
             
-            if itemSuccess and item and type(item) == "table" then
-                -- Handle both single item and array of items
-                local itemsArray = item
-                if not item[1] then -- Single item, not array
-                    itemsArray = {item}
+            if type(item) == "table" then
+                if item.count and item.count > 0 then
+                    -- Single item with count property
+                    hasItem = true
+                    itemData = item
+                elseif #item > 0 then
+                    -- Array of items
+                    hasItem = true
+                    itemData = item[1] -- Use first item
+                end
+            elseif type(item) == "number" and item > 0 then
+                -- Just a count
+                hasItem = true
+                itemData = { count = item }
+            end
+            
+            if hasItem then
+                print("^2[GET AXES]^7 Player " .. source .. " confirmed to have " .. axeName)
+                
+                local durability = 100 -- Default durability
+                if itemData and itemData.metadata and itemData.metadata.durability then
+                    durability = itemData.metadata.durability
                 end
                 
-                for _, axeItem in ipairs(itemsArray) do
-                    if axeItem then
-                        table.insert(axes, {
-                            name = axeName,
-                            tier = axeData.tier,
-                            power = axeData.power,
-                            durability = axeItem.metadata and axeItem.metadata.durability or 100, -- Default 100 if no metadata
-                            slot = axeItem.slot or 0,
-                            id = axeItem.id or 0 -- Unique item ID for removal
-                        })
-                        print("^2[GET AXES]^7 Added " .. axeName .. " tier " .. axeData.tier .. " durability " .. (axeItem.metadata and axeItem.metadata.durability or 100))
-                    end
-                end
-            else
-                -- Fallback: create a basic axe entry even if we can't get detailed info
-                print("^3[GET AXES]^7 Could not get detailed info for " .. axeName .. ", using fallback")
                 table.insert(axes, {
                     name = axeName,
                     tier = axeData.tier,
                     power = axeData.power,
-                    durability = 100, -- Default durability
-                    slot = 0,
-                    id = 0
+                    durability = durability,
+                    slot = itemData and itemData.slot or 0,
+                    id = itemData and itemData.id or 0,
+                    metadata = itemData and itemData.metadata or {}
                 })
+                print("^2[GET AXES]^7 Added " .. axeName .. " tier " .. axeData.tier .. " durability " .. durability)
+            else
+                print("^3[GET AXES]^7 Player " .. source .. " has " .. axeName .. " but count is 0 or invalid")
             end
         else
-            print("^3[GET AXES]^7 Player " .. source .. " does not have " .. axeName .. " (count: " .. tostring(count) .. ")")
+            print("^3[GET AXES]^7 Player " .. source .. " does not have " .. axeName .. " (error or not found)")
         end
     end
     
