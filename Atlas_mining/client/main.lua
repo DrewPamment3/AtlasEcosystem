@@ -69,8 +69,22 @@ end
 
 -- Load audio banks on script start
 Citizen.CreateThread(function()
-    Citizen.Wait(1000) -- Wait a moment for the game to be ready
+    Citizen.Wait(3000) -- Wait longer for RedM to be ready
+    print("^3[ATLAS MINING AUDIO]^7 Initializing audio system...")
     LoadMiningAudioBanks()
+    
+    -- Force load if it failed
+    if not audioLoaded then
+        print("^3[ATLAS MINING AUDIO]^7 First attempt failed, trying again...")
+        Citizen.Wait(2000)
+        LoadMiningAudioBanks()
+    end
+    
+    -- Final fallback - just mark as loaded and try direct sound calls
+    if not audioLoaded then
+        print("^3[ATLAS MINING AUDIO]^7 Using fallback mode - sounds will be attempted directly")
+        audioLoaded = true
+    end
 end)
 
 -- [[ UI ]]
@@ -345,6 +359,19 @@ RegisterCommand('reloadaudio', function(source, args, rawCommand)
         color = { 255, 165, 0 },
         multiline = true,
         args = { "Audio Reload", "Attempting to reload audio banks - check console" }
+    })
+end)
+
+--- DEBUG: Force enable audio (/forceaudio)
+RegisterCommand('forceaudio', function(source, args, rawCommand)
+    print("^3[Atlas Mining Audio]^7 Force enabling audio system...")
+    audioLoaded = true
+    
+    print("^2[Atlas Mining Audio]^7 Audio system force enabled!")
+    TriggerEvent('chat:addMessage', {
+        color = { 0, 255, 0 },
+        multiline = true,
+        args = { "Audio Force", "Audio system enabled - try /testminingsounds" }
     })
 end)
 
