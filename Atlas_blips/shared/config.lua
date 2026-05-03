@@ -33,7 +33,8 @@ AtlasBlipsConfig.Sprites = {
 AtlasBlipsConfig.RadiusAlpha = 128
 
 -- Scale of the sprite blip (icon size)
-AtlasBlipsConfig.SpriteScale = 0.8
+-- RDR3 blips are much larger than GTA V; 0.2-0.5 is appropriate
+AtlasBlipsConfig.SpriteScale = 0.2
 
 -- ============================================================
 -- BLIP DISPLAY CATEGORIES
@@ -61,4 +62,4 @@ AtlasBlipsConfig.Tables = {
 -- ============================================================
 
 -- Delay (in ms) after player loads before refreshing blips on reconnect
-AtlasBlipsConfig.ReconnectBlipDelay = 3000
+AtlasBlipsConfig.ReconnectBlipDelay = 5000
