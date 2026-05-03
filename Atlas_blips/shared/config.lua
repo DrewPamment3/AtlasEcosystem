@@ -11,17 +11,17 @@ AtlasBlipsConfig.DebugLogging = true
 -- BLIP APPEARANCE
 -- ============================================================
 
--- STRING NAMES for RDR3 colors (hashed at runtime via GetHashKey)
+-- RDR3 Color Hashes (raw hex values, passed directly to natives)
 AtlasBlipsConfig.Colors = {
-    mining = "BLIP_COLOR_GREY",       -- RDR3 standard grey
-    woodcutting = "BLIP_COLOR_BROWN", -- RDR3 standard brown
+    mining = 0x32A69E81,       -- BLIP_COLOR_GREY
+    woodcutting = 0x662D3643, -- BLIP_COLOR_BROWN
 }
 
--- STRING NAMES for RDR3 sprites (hashed at runtime via GetHashKey)
+-- RDR3 Sprite Hashes (raw hex values, passed directly to natives)
 AtlasBlipsConfig.Sprites = {
-    mining = "blip_ambient_pickaxe",  -- Pickaxe icon for mining zones
-    woodcutting = "blip_ambient_herb", -- Herb/leaf icon for woodcutting zones
-    radius = "blip_type_radius",      -- Radius circle type
+    mining = 0x46E47A9A,         -- blip_ambient_pickaxe (unconfirmed, may need replacing)
+    woodcutting = 0x7181B53C,    -- blip_event_appleseed (confirmed: 1904459580)
+    radius = 0x697D59A,          -- blip_type_radius
 }
 
 -- Radius Blip Alpha (128 = 50% transparent, makes the circle semi-transparent)
