@@ -28,18 +28,24 @@ local function CreateZoneBlips(zoneData)
         return nil
     end
 
-    local colorHash = Config.Colors[zoneData.type]
-    local spriteHash = Config.Sprites[zoneData.type]
-    local radiusHash = Config.Sprites.radius
+    -- Hash the string names at RUNTIME using the game engine's GetHashKey
+    -- This avoids compile-time backtick hashing producing wrong values
+    local colorName = Config.Colors[zoneData.type]
+    local spriteName = Config.Sprites[zoneData.type]
+    local radiusName = Config.Sprites.radius
 
-    if not colorHash or not spriteHash then
+    if not colorName or not spriteName then
         print("^1[ATLAS BLIPS]^7 ERROR: Missing config for zone type: " .. zoneData.type)
         return nil
     end
 
+    local colorHash = GetHashKey(colorName)
+    local spriteHash = GetHashKey(spriteName)
+    local radiusHash = GetHashKey(radiusName)
+
     if Config.DebugLogging then
-        print(string.format("^3[ATLAS BLIPS]^7   Sprite hash: 0x%X, Color hash: 0x%X, Radius hash: 0x%X",
-            spriteHash, colorHash, radiusHash))
+        print(string.format("^3[ATLAS BLIPS]^7   Sprite: '%s' -> 0x%X, Color: '%s' -> 0x%X, Radius: '%s' -> 0x%X",
+            spriteName, spriteHash, colorName, colorHash, radiusName, radiusHash))
     end
 
     -- ========================================================
