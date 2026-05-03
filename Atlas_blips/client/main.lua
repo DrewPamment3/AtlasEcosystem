@@ -28,94 +28,78 @@ local function CreateZoneBlips(zoneData)
         return nil
     end
 
-    -- Get color and sprite settings for this zone type
-    local colorID = Config.Colors[zoneData.type]
-    local spriteName = Config.Sprites[zoneData.type]
+    local colorHash = Config.Colors[zoneData.type]
+    local spriteHash = Config.Sprites[zoneData.type]
+    local radiusHash = Config.Sprites.radius
 
-    if not colorID or not spriteName then
+    if not colorHash or not spriteHash then
         print("^1[ATLAS BLIPS]^7 ERROR: Missing config for zone type: " .. zoneData.type)
         return nil
     end
 
-    -- Convert sprite name to hash
-    local spriteHash = GetHashKey(spriteName)
-
     if Config.DebugLogging then
-        print(string.format("^3[ATLAS BLIPS]^7   Sprite: %s (hash: %d), Color: %d", spriteName, spriteHash, colorID))
+        print(string.format("^3[ATLAS BLIPS]^7   Sprite hash: 0x%X, Color hash: 0x%X, Radius hash: 0x%X",
+            spriteHash, colorHash, radiusHash))
     end
 
+    -- ========================================================
+    -- 1. Create RADIUS BLIP (The Area Circle)
+    -- Native: 0x45F13B7E0A770A54 (ADD_BLIP_FOR_RADIUS)
+    -- RDR3 Signature: (float x, float y, float z, float radius)
+    -- ========================================================
     local radiusBlip = nil
-    local spriteBlip = nil
-
-    -- Create RADIUS BLIP (the area circle on the map)
-    -- Native: AddBlipForRadius(x, y, z, radius) - 0x45F13B7E0A770A54
     local radiusSuccess = pcall(function()
         radiusBlip = AddBlipForRadius(zoneData.x, zoneData.y, zoneData.z, zoneData.radius)
     end)
 
     if not radiusSuccess or not radiusBlip or radiusBlip == 0 then
-        print("^1[ATLAS BLIPS]^7 ERROR: Failed to create radius blip for " .. zoneData.type .. " zone " .. zoneData.id)
-
-        -- Try fallback: create radius blip at the coords directly
-        -- Some RedM builds may behave differently
-        radiusSuccess = pcall(function()
-            radiusBlip = AddBlipForRadius(zoneData.x, zoneData.y, zoneData.z, zoneData.radius)
-        end)
-
-        if not radiusSuccess or not radiusBlip or radiusBlip == 0 then
-            print("^1[ATLAS BLIPS]^7 Fallback also failed for radius blip - zone will have icon only")
-            radiusBlip = nil
-        end
+        print("^1[ATLAS BLIPS]^7 WARNING: Failed to create radius blip for " .. zoneData.type .. " zone " .. zoneData.id)
+        radiusBlip = nil
     end
 
     -- Style the radius blip
     if radiusBlip then
+        SetBlipSprite(radiusBlip, radiusHash, true) -- Set as radius/circle type
+        SetBlipColour(radiusBlip, colorHash)
         SetBlipAlpha(radiusBlip, Config.RadiusAlpha)
-        SetBlipColour(radiusBlip, colorID)
-        -- Don't show the radius blip's own sprite (show it as a circle only)
-        SetBlipSprite(radiusBlip, 0, true) -- Sprite 0 with high-altitude flag to make circle-only
 
         if Config.DebugLogging then
             print("^2[ATLAS BLIPS]^7   Radius blip created: " .. tostring(radiusBlip))
         end
     end
 
-    -- Create SPRITE BLIP (the central icon on the map)
-    -- Native: AddBlipForCoord(spriteHash, x, y, z) but in RDR3 we use:
-    --   blip = AddBlipForCoord(x, y, z) then SetBlipSprite(blip, hash)
-    -- Actually RDR3 has direct: blip = MapBlip(id) but standard CFX approach:
+    -- ========================================================
+    -- 2. Create SPRITE BLIP (The Icon)
+    -- Native: 0x554D9D53F696D002 (ADD_BLIP_FOR_COORD)
+    -- RDR3 Signature: (Hash blipHash, float x, float y, float z)
+    -- ========================================================
+    local spriteBlip = nil
     local spriteSuccess = pcall(function()
-        spriteBlip = AddBlipForCoord(zoneData.x, zoneData.y, zoneData.z)
+        spriteBlip = AddBlipForCoord(spriteHash, zoneData.x, zoneData.y, zoneData.z)
     end)
 
     if not spriteSuccess or not spriteBlip or spriteBlip == 0 then
-        -- Fallback: try the GTA-style MapBlip approach
-        spriteSuccess = pcall(function()
-            spriteBlip = AddBlipForCoord(zoneData.x, zoneData.y, zoneData.z)
-        end)
-
-        if not spriteSuccess or not spriteBlip or spriteBlip == 0 then
-            print("^1[ATLAS BLIPS]^7 ERROR: Failed to create sprite blip for " .. zoneData.type .. " zone " .. zoneData.id)
-            spriteBlip = nil
-        end
+        print("^1[ATLAS BLIPS]^7 ERROR: Failed to create sprite blip for " .. zoneData.type .. " zone " .. zoneData.id)
+        spriteBlip = nil
     end
 
     -- Style the sprite blip
     if spriteBlip then
-        SetBlipSprite(spriteBlip, spriteHash, true)
-        SetBlipColour(spriteBlip, colorID)
+        SetBlipColour(spriteBlip, colorHash)
         SetBlipScale(spriteBlip, Config.SpriteScale)
-        SetBlipAsShortRange(spriteBlip, false) -- Show even at long range
-        BeginTextCommandSetBlipName("STRING")
-        AddTextComponentSubstringPlayerName(zoneData.name)
-        EndTextCommandSetBlipName(spriteBlip)
+
+        -- Set the Name (RDR3 Native: 0x9CB1A1623062F402)
+        -- SetBlipNameFromPlayerName is the RDR3 standard for assigning a string label
+        Citizen.InvokeNative(0x9CB1A1623062F402, spriteBlip, zoneData.name)
 
         if Config.DebugLogging then
             print("^2[ATLAS BLIPS]^7   Sprite blip created: " .. tostring(spriteBlip) .. " name: " .. zoneData.name)
         end
     end
 
-    -- Return the blips we created (may have one or both)
+    -- ========================================================
+    -- Return result
+    -- ========================================================
     local result = { radiusBlip = radiusBlip, spriteBlip = spriteBlip }
 
     if not radiusBlip and not spriteBlip then
@@ -125,6 +109,33 @@ local function CreateZoneBlips(zoneData)
 
     return result
 end
+
+-- ============================================================
+-- BLIP CATEGORY VISIBILITY (Toggle without deleting/recreating)
+-- ============================================================
+
+local function SetCategoryVisibility(category, visible)
+    local displayMode = visible and 2 or 0 -- 2 is visible, 0 is hidden (RDR3 SetBlipDisplay)
+    local count = 0
+    for zoneKey, blips in pairs(ActiveBlips) do
+        if zoneKey:match("^" .. category .. "_") then
+            if blips.radiusBlip then
+                SetBlipDisplay(blips.radiusBlip, displayMode)
+            end
+            if blips.spriteBlip then
+                SetBlipDisplay(blips.spriteBlip, displayMode)
+            end
+            count = count + 1
+        end
+    end
+    if Config.DebugLogging then
+        print(string.format("^2[ATLAS BLIPS]^7 Set %d %s zones to visibility mode %d", count, category, displayMode))
+    end
+end
+
+-- ============================================================
+-- BLIP REMOVAL FUNCTIONS
+-- ============================================================
 
 -- Remove all active blips from the map
 local function RemoveAllBlips()
@@ -265,27 +276,8 @@ RegisterCommand('toggleblips', function(source, args)
 
     print(string.format("^2[ATLAS BLIPS]^7 %s blips now: %s", zoneType, isEnabled and "ENABLED" or "DISABLED"))
 
-    -- If enabled, recreate from server; if disabled, remove matching blips
-    if isEnabled then
-        -- Request full zone data reload from server
-        TriggerServerEvent('atlas_blips:server:playerLoaded')
-    else
-        -- Remove all blips for this zone type
-        local removedCount = 0
-        for zoneKey, blips in pairs(ActiveBlips) do
-            if zoneKey:match("^" .. zoneType .. "_") then
-                if blips.radiusBlip then
-                    pcall(function() RemoveBlip(blips.radiusBlip) end)
-                end
-                if blips.spriteBlip then
-                    pcall(function() RemoveBlip(blips.spriteBlip) end)
-                end
-                ActiveBlips[zoneKey] = nil
-                removedCount = removedCount + 1
-            end
-        end
-        print(string.format("^2[ATLAS BLIPS]^7 Removed %d %s blip zones", removedCount, zoneType))
-    end
+    -- Use SetBlipDisplay to toggle visibility without deleting blips
+    SetCategoryVisibility(zoneType, isEnabled)
 end)
 
 -- ============================================================
