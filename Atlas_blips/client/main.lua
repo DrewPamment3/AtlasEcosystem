@@ -100,6 +100,19 @@ local function RDR_SetBlipAlpha(blip, alpha)
     Citizen.InvokeNative(0x45FF974EEE1C8734, blip, alpha)
 end
 
+local function RDR_SetBlipRadius(blip, radius)
+    -- Sets the radius display size for a radius-type blip sprite.
+    -- Must be called AFTER creation and AFTER SetBlipDisplay.
+    -- Native: 0x340CF8A9750E9669
+    Citizen.InvokeNative(0x340CF8A9750E9669, blip, radius)
+end
+
+local function RDR_SetBlipDisplay(blip, displayType)
+    -- Sets WHERE the blip appears: 0=hidden, 2=main map, 3=both
+    -- Native: 0xA1509A8E850B0347 (RDR2 hash for SetBlipDisplay)
+    Citizen.InvokeNative(0xA1509A8E850B0347, blip, displayType)
+end
+
 -- ============================================================
 -- BLIP CREATION
 -- ============================================================
@@ -155,18 +168,22 @@ local function CreateZoneBlip(zoneData)
     end
 
     -- ============================================================
-    -- STEP 2: CREATE RADIUS BLIP (dedicated radius native)
+    -- STEP 2: CREATE RADIUS BLIP (the colored zone circle)
     -- ============================================================
     local radiusBlip = RDR_CreateRadiusBlip(SpriteHashes.radius, x, y, z, radius)
 
     if radiusBlip and radiusBlip ~= 0 then
+        -- CRITICAL: Must call SetBlipDisplay or the radius circle is invisible
+        RDR_SetBlipDisplay(radiusBlip, 3)   -- 3 = visible on minimap AND world map
+        RDR_SetBlipRadius(radiusBlip, radius)
         RDR_SetBlipColour(radiusBlip, colorIndex)
         RDR_SetBlipAlpha(radiusBlip, Config.RadiusAlpha)
-        RDR_SetBlipScale(radiusBlip, 0.1)
+        RDR_SetBlipScale(radiusBlip, 0.01)   -- Keep anchor point tiny
 
         if Config.DebugLogging then
             print("^2[ATLAS BLIPS]^7   + radius blip handle=" .. tostring(radiusBlip) ..
-                  " r=" .. radius .. " alpha=" .. Config.RadiusAlpha)
+                  " r=" .. radius .. " alpha=" .. Config.RadiusAlpha ..
+                  " color=" .. colorIndex .. " display=3")
         end
     else
         if Config.DebugLogging then
