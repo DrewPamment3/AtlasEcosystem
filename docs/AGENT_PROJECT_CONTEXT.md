@@ -283,29 +283,34 @@ The function definitions in `main.lua` SHADOW those in `tool_validation.lua` (if
 
 ### 🔴 RDR2 Blip API (CORRECT VALUES)
 
-RedM uses **RDR2 blip natives**, which have different signatures and palette values than GTA V:
+RedM uses **RDR2 blip natives** with a completely different creation pattern than GTA V:
 
 ```lua
--- CORRECT: RDR2 CreateBlip(blipHash, x, y, z)
-local blip = CreateBlip(spriteHash, x, y, z)
+-- ⬅ CRITICAL: RDR2 blips are created in TWO STEPS:
+-- Step 1: Create a blip with a STYLE hash (NOT a sprite/icon hash)
+local blip = Citizen.InvokeNative(0x554D9D53F696D002, styleHash, x, y, z)
+-- Step 2: Apply the sprite icon AFTER creation
+Citizen.InvokeNative(0x74F74D3207ED525C, blip, spriteHash, true)
 
--- CORRECT integer palette indices (NOT hex ARGB!):
+-- OR for radius blips (zone circles), use the dedicated native:
+local radiusBlip = Citizen.InvokeNative(0x45F13B7E0A15C880, hash, x, y, z, radius)
+
+-- Blip name uses raw string (NOT CreateVarString):
+Citizen.InvokeNative(0x9CB1A1623062F402, blip, "Zone Name")
+
+-- Palette indices (NOT hex ARGB!):
 -- 1=Red, 2=Green, 3=Blue, 5=Yellow, 6=Orange
 -- 8=Grey, 11=DarkGrey, 25=Brown, 27=LightBrown
-
--- CRITICAL: Must set display type or blip is invisible
-SetBlipDisplay(blip, 3)  -- 3 = both minimap AND world map
-
--- SetBlipColour takes palette INDEX, not hex color
-SetBlipColour(blip, 8)   -- grey (palette index)
-
--- Joaat sprite names at runtime: GetHashKey("blip_ambient_pickaxe")
+Citizen.InvokeNative(0x03D7FB09E75D6B7E, blip, 8)  -- SetBlipColour
 ```
 
 **DO NOT:**
-- Use `AddBlipForCoord()` — this is the GTA V/C# API, NOT available in RedM Lua
-- Pass hex ARGB values (`0x32A69E81`) to `SetBlipColour` — it expects 0-255 palette index
-- Omit `SetBlipDisplay()` — the blip will exist in memory but be invisible by default
+- Pass a sprite hash directly to `BlipAddForCoords` — it takes a STYLE hash first
+- Skip `SetBlipSprite()` — the style-created blip has no icon until you set one
+- Use `CreateBlip()` or `AddBlipForCoord()` — these are GTA V Lua wrappers that don't exist in RedM
+- Use `CreateVarString` for blip names — `SetBlipNameFromPlayerString` takes a raw Lua string
+- Use GTA V native hashes for `SetBlipSprite` — RDR2 uses `0x74F74D3207ED525C` (NOT `0x74F74D3207AD5EE5`)
+- Remove blips with `0x86A652570E5F25DD` — RDR2 uses `0xDEEDE7C41742E011` (AbandonBlip)
 
 ---
 
