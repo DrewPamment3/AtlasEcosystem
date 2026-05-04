@@ -1,7 +1,7 @@
 fx_version 'cerulean'
 game 'rdr3'
 rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aware my resources *will* become incompatible once RedM ships.'
--- lua54 'yes'
+lua54 'yes'
 
 author 'DrewPamment3'
 description 'Atlas Woodcutting - RPG Gathering Module'
@@ -16,6 +16,7 @@ client_scripts {
 }
 
 server_scripts {
+    'server/tool_validation.lua',  -- Must load BEFORE main.lua (validation functions used by main.lua)
     'server/main.lua'
 }
 

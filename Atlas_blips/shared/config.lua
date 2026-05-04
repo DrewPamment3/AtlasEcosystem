@@ -11,34 +11,49 @@ AtlasBlipsConfig.DebugLogging = true
 -- BLIP APPEARANCE
 -- ============================================================
 
--- RDR3 Color Hashes (raw hex values, passed directly to natives)
+-- RDR2 Blip Color indices (INTEGER values, NOT hex color codes)
+-- These are indices into the game's internal blip color palette
+-- Common RDR2 values:
+--   1 = Red, 2 = Green, 3 = Blue, 4 = White (player),
+--   5 = Yellow, 6 = Orange, 7 = Light Blue, 8 = Grey,
+--   11 = Dark Grey, 25 = Brown/Dark Orange, 27 = Light Brown
+--   Full list: https://alloc8or.re/rdr3/doc/blips/
 AtlasBlipsConfig.Colors = {
-    mining = 0x32A69E81,       -- BLIP_COLOR_GREY
-    woodcutting = 0x662D3643, -- BLIP_COLOR_BROWN
+    mining      = 8,   -- Grey
+    woodcutting = 27,  -- Light Brown (native palette index)
 }
 
--- RDR3 Sprite Hashes (raw hex values, passed directly to natives)
+-- RDR2 Blip Sprite Hash (Joaat integer)
+-- These should be computed from the string name via GetHashKey()
+-- But we define known-good values explicitly here for reference
 AtlasBlipsConfig.Sprites = {
-    mining = 0x46E47A9A,         -- blip_ambient_pickaxe (unconfirmed, may need replacing)
-    woodcutting = 0x7181B53C,    -- blip_event_appleseed (confirmed: 1904459580)
-    radius = 0x697D59A,          -- blip_type_radius
+    -- WHY THE CONFIG VALUES WERE WRONG BEFORE:
+    -- 0x46E47A9A is NOT 'blip_ambient_pickaxe' -- it's something else
+    -- Joaat('blip_ambient_pickaxe') = -1271083164 (0xB472D464)
+    -- Joaat('blip_event_appleseed') = 1904459580 (0x7181B53C) ← CONFIRMED WORKING
+    -- Joaat('blip_type_radius') = -1840767986 (0x92558E0E)
+    mining      = "blip_ambient_pickaxe",   -- Will be Joaat'd at runtime
+    woodcutting = "blip_event_appleseed",   -- 1904459580 / 0x7181B53C (Confirmed by native test)
+    radius      = "blip_type_radius",        -- Will be Joaat'd at runtime
 }
 
--- Radius Blip Alpha (128 = 50% transparent, makes the circle semi-transparent)
+-- Radius Blip Alpha (0-255)
+-- 128 = 50% transparent, makes the circle semi-transparent so it doesn't
+-- block the underlying map terrain
 AtlasBlipsConfig.RadiusAlpha = 128
 
--- Scale of the sprite blip (icon size)
--- RDR3 blips are much larger than GTA V; 0.2-0.5 is appropriate
-AtlasBlipsConfig.SpriteScale = 0.2
+-- Scale of the sprite blip (icon size on minimap/world map)
+-- RDR2 blips are naturally larger than GTA V
+-- 0.3-0.6 is a good range for visible but not oversized
+AtlasBlipsConfig.SpriteScale = 0.4
 
 -- ============================================================
 -- BLIP DISPLAY CATEGORIES
 -- ============================================================
 
--- Toggle which types of blips are created
--- Set to false to disable a specific type of zone
+-- Toggle which types of blips are shown on the map
 AtlasBlipsConfig.ShowBlips = {
-    mining = true,
+    mining      = true,
     woodcutting = true,
 }
 
@@ -46,9 +61,9 @@ AtlasBlipsConfig.ShowBlips = {
 -- DATABASE SETTINGS
 -- ============================================================
 
--- Tables to query for zone data
+-- Tables queried for zone data on resource start
 AtlasBlipsConfig.Tables = {
-    mining = "atlas_mining_camps",
+    mining      = "atlas_mining_camps",
     woodcutting = "atlas_woodcutting_forests",
 }
 
@@ -56,5 +71,7 @@ AtlasBlipsConfig.Tables = {
 -- CLIENT SETTINGS
 -- ============================================================
 
--- Delay (in ms) after player loads before refreshing blips on reconnect
+-- Delay (ms) after player loads before requesting zone data
+-- Allow time for the character system and other resources to initialize
 AtlasBlipsConfig.ReconnectBlipDelay = 5000
+
