@@ -27,14 +27,11 @@ AtlasBlipsConfig.Colors = {
 -- These should be computed from the string name via GetHashKey()
 -- But we define known-good values explicitly here for reference
 AtlasBlipsConfig.Sprites = {
-    -- WHY THE CONFIG VALUES WERE WRONG BEFORE:
-    -- 0x46E47A9A is NOT 'blip_ambient_pickaxe' -- it's something else
-    -- Joaat('blip_ambient_pickaxe') = -1271083164 (0xB472D464)
-    -- Joaat('blip_event_appleseed') = 1904459580 (0x7181B53C) ← CONFIRMED WORKING
-    -- Joaat('blip_type_radius') = -1840767986 (0x92558E0E)
-    mining      = "blip_ambient_pickaxe",   -- Will be Joaat'd at runtime
-    woodcutting = "blip_event_appleseed",   -- 1904459580 / 0x7181B53C (Confirmed by native test)
-    radius      = "blip_type_radius",        -- Will be Joaat'd at runtime
+    -- All sprite names confirmed to exist in RDR2 via femga/rdr3_discoveries
+    -- texture list: https://github.com/femga/rdr3_discoveries/tree/master/useful_info_from_rpfs/textures/blips
+    mining      = "blip_ambient_pickaxe",   -- Joaat: -1397823383
+    woodcutting = "blip_event_appleseed",   -- Joaat: 1904459580 (confirmed working)
+    radius      = "blip_radius_search",     -- Joaat: 150441873 (confirmed in femga blip textures)
 }
 
 -- Radius Blip Alpha (0-255)
