@@ -130,38 +130,23 @@ local function CreateZoneBlip(zoneData)
     RDR_SetBlipColour(spriteBlip, colorIdx)
     RDR_SetBlipScale(spriteBlip, Config.SpriteScale)
 
+    -- ============================================================
+    -- RADIUS INDICATOR (applied to the icon blip itself)
+    -- ============================================================
+    -- Apply a colored shaded circle around the icon showing the zone boundary.
+    -- Pattern: radius is added as a property of the icon blip, not a separate entity.
+    -- Alpha set to 255 (fully opaque) because dark colors (brown/grey)
+    -- need full opacity to show against the dark map background.
+    RDR_SetBlipRadius(spriteBlip, radius)
+    RDR_SetBlipAlpha(spriteBlip, 255)
+
     if Config.DebugLogging then
         print("^2[ATLAS BLIPS]^7 Icon: handle=" .. spriteBlip ..
-              " name='" .. zoneName .. "' sprite=" .. spriteHash .. " color=" .. colorIdx)
+              " name='" .. zoneName .. "' sprite=" .. spriteHash ..
+              " color=" .. colorIdx .. " radius=" .. radius)
     end
 
-    -- ============================================================
-    -- RADIUS BLIP (the colored zone circle)
-    -- ============================================================
-    -- Uses the SAME BlipAddForCoord native with BLIP_STYLE_RADIUS style.
-    -- The dedicated radius native 0x45F13B7E0A15C880 returns 0 on all RedM builds.
-    -- The sprite "blip_radius_search" (hash 150441873) is confirmed in
-    -- femga/rdr3_discoveries/useful_info_from_rpfs/textures/blips
-    local radiusBlip = RDR_BlipAddForCoord(BLIP_STYLE_RADIUS, x, y, z)
-    if radiusBlip and radiusBlip ~= 0 then
-        RDR_SetBlipSprite(radiusBlip, SpriteHashes.radius, true)
-        RDR_SetBlipDisplay(radiusBlip, 3)          -- MUST call or circle is invisible
-        RDR_SetBlipRadius(radiusBlip, radius)       -- Defines the circle size
-        RDR_SetBlipColour(radiusBlip, colorIdx)
-        RDR_SetBlipAlpha(radiusBlip, Config.RadiusAlpha)
-        RDR_SetBlipScale(radiusBlip, 0.01)          -- Anchor dot: tiny
-
-        if Config.DebugLogging then
-            print("^2[ATLAS BLIPS]^7  Radius: handle=" .. radiusBlip ..
-                  " r=" .. radius .. " alpha=" .. Config.RadiusAlpha .. " color=" .. colorIdx)
-        end
-    else
-        if Config.DebugLogging then
-            print("^3[ATLAS BLIPS]^7  Radius blip creation returned 0 for " .. zoneName)
-        end
-    end
-
-    return { spriteBlip = spriteBlip, radiusBlip = radiusBlip }
+    return { spriteBlip = spriteBlip, radiusBlip = nil }
 end
 
 -- ============================================================
