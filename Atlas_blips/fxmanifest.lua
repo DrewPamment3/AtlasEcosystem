@@ -4,7 +4,7 @@ rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aw
 lua54 'yes'
 
 author 'DrewPamment3'
-description 'Atlas Woodcutting - RPG Gathering Module'
+description 'Atlas Blips - Dynamic Zone Visualization for RDR3 Map'
 version '1.0'
 
 shared_scripts {
@@ -16,13 +16,10 @@ client_scripts {
 }
 
 server_scripts {
-    'server/tool_validation.lua',  -- Must load BEFORE main.lua (validation functions used by main.lua)
     'server/main.lua'
 }
 
 dependencies {
     'vorp_core',
-    'vorp_inventory',
-    'oxmysql',
-    'Atlas_skilling' -- Essential: Allows use of AddSkillXP and GetSkillLevel
+    'oxmysql'
 }

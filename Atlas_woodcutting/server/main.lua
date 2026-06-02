@@ -8,259 +8,12 @@ local ForestTreeStates = {} -- Track dead trees: {forestId = {treeIndex = chopTi
 local RespawnTimers = {}    -- Track respawn timers: {forestId_treeIndex = timerId}
 
 -- ============================================================
--- TOOL VALIDATION FUNCTIONS (Embedded to avoid scope issues)
+-- TOOL VALIDATION FUNCTIONS
+-- NOTE: These are now loaded from server/tool_validation.lua
+-- (which loads BEFORE main.lua via fxmanifest server_scripts order)
 -- ============================================================
 
--- Get all axes from player inventory with their durability and slot info
-local function GetPlayerAxes(source)
-    local axes = {}
-    
-    for axeName, axeData in pairs(Config.Axes) do
-        print("^3[GET AXES DEBUG]^7 Checking for axe: " .. axeName)
-        
-        -- Try to get the item directly (this seems to work better with VORP inventory)
-        local success, item = pcall(function()
-            return exports.vorp_inventory:getItem(source, axeName)
-        end)
-        
-        if success and item then
-            print("^2[GET AXES]^7 Player " .. source .. " has " .. axeName .. ": " .. tostring(item))
-            
-            -- Handle different return formats from VORP inventory
-            local hasItem = false
-            local itemData = nil
-            
-            if type(item) == "table" then
-                if item.count and item.count > 0 then
-                    -- Single item with count property
-                    hasItem = true
-                    itemData = item
-                elseif #item > 0 then
-                    -- Array of items
-                    hasItem = true
-                    itemData = item[1] -- Use first item
-                end
-            elseif type(item) == "number" and item > 0 then
-                -- Just a count
-                hasItem = true
-                itemData = { count = item }
-            end
-            
-            if hasItem then
-                print("^2[GET AXES]^7 Player " .. source .. " confirmed to have " .. axeName)
-                
-                local durability = 100 -- Default durability
-                if itemData and itemData.metadata and itemData.metadata.durability then
-                    durability = itemData.metadata.durability
-                end
-                
-                table.insert(axes, {
-                    name = axeName,
-                    tier = axeData.tier,
-                    power = axeData.power,
-                    durability = durability,
-                    slot = itemData and itemData.slot or 0,
-                    id = itemData and itemData.id or 0,
-                    metadata = itemData and itemData.metadata or {}
-                })
-                print("^2[GET AXES]^7 Added " .. axeName .. " tier " .. axeData.tier .. " durability " .. durability)
-            else
-                print("^3[GET AXES]^7 Player " .. source .. " has " .. axeName .. " but count is 0 or invalid")
-            end
-        else
-            print("^3[GET AXES]^7 Player " .. source .. " does not have " .. axeName .. " (error or not found)")
-        end
-    end
-    
-    print("^2[GET AXES]^7 Player " .. source .. " total axes found: " .. #axes)
-    return axes
-end
-
--- Find the best (highest tier) axe available
-local function GetBestAxe(axes)
-    if #axes == 0 then return nil end
-    
-    -- Sort by tier (highest first), then by durability (highest first)
-    table.sort(axes, function(a, b)
-        if a.tier == b.tier then
-            return a.durability > b.durability -- Same tier = prefer higher durability
-        end
-        return a.tier > b.tier -- Higher tier = better
-    end)
-    
-    return axes[1] -- Return best axe
-end
-
--- Check if player meets level requirement for grove tier
-local function CheckLevelRequirement(source, groveTier)
-    -- Debug mode bypass
-    if Config.DebugLogging then
-        print("^3[TOOL VALIDATION]^7 Debug mode enabled - bypassing level requirements")
-        return true, nil
-    end
-    
-    local requiredLevel = Config.GroveUnlocks[groveTier]
-    if not requiredLevel then
-        return true, nil -- No level requirement
-    end
-    
-    -- Get player's woodcutting level using sync method
-    local success, playerLevel = pcall(function()
-        return exports['Atlas_skilling']:GetSkillLevelSync(source, 'woodcutting')
-    end)
-    
-    if not success or not playerLevel then
-        print("^1[TOOL VALIDATION]^7 Failed to get player woodcutting level")
-        return false, "Unable to check your woodcutting level"
-    end
-    
-    if playerLevel < requiredLevel then
-        return false, requiredLevel
-    end
-    
-    return true, nil
-end
-
--- Main tool validation function
-function ValidateWoodcuttingTools(source, groveTier)
-    print("^2[VALIDATE TOOLS]^7 ValidateWoodcuttingTools called for player " .. source .. " grove tier " .. groveTier)
-    
-    local result = {
-        hasValidTool = false,
-        bestTool = nil,
-        levelValid = false,
-        requiredLevel = nil,
-        errorMessage = nil,
-        willBreak = false
-    }
-    
-    -- Debug mode - bypass all requirements
-    if Config.DebugLogging then
-        print("^2[VALIDATE TOOLS]^7 Debug mode enabled - bypassing all requirements")
-        result.hasValidTool = true
-        result.levelValid = true
-        result.bestTool = { name = "debug_axe", tier = 5, durability = 100, power = 3.0 }
-        return result
-    end
-    
-    -- Step 1: Check level requirements
-    local levelValid, requiredLevel = CheckLevelRequirement(source, groveTier)
-    result.levelValid = levelValid
-    result.requiredLevel = requiredLevel
-    
-    if not levelValid then
-        if type(requiredLevel) == "number" then
-            result.errorMessage = "Requires Woodcutting Level " .. requiredLevel
-        else
-            result.errorMessage = requiredLevel -- Error message string
-        end
-        return result
-    end
-    
-    -- Step 2: Get player's axes
-    local axes = GetPlayerAxes(source)
-    
-    if #axes == 0 then
-        result.errorMessage = "Requires Axe (Crude or better)"
-        return result
-    end
-    
-    -- Step 3: Find best axe
-    local bestAxe = GetBestAxe(axes)
-    
-    if not bestAxe then
-        result.errorMessage = "No usable axe found"
-        return result
-    end
-    
-    -- Step 4: Check if tool will break after this action
-    result.willBreak = (bestAxe.durability <= 5)
-    
-    -- Step 5: Success!
-    result.hasValidTool = true
-    result.bestTool = bestAxe
-    
-    return result
-end
-
--- Handle tool durability reduction and breaking
-function HandleAxeDurability(source, toolData)
-    if Config.DebugLogging then
-        print("^3[TOOL DURABILITY]^7 Debug mode - skipping durability handling")
-        return true
-    end
-    
-    local newDurability = toolData.durability - 5
-    
-    if newDurability <= 0 then
-        -- Tool breaks - replace with broken version
-        local brokenName = "broken_" .. toolData.name
-        
-        -- Remove original tool
-        local success1 = pcall(function()
-            exports.vorp_inventory:subItem(source, toolData.name, 1, toolData.metadata or {})
-        end)
-        
-        if not success1 then
-            print("^1[TOOL DURABILITY]^7 Failed to remove broken tool: " .. toolData.name)
-            return false
-        end
-        
-        -- Add broken version
-        local success2 = pcall(function()
-            exports.vorp_inventory:addItem(source, brokenName, 1, { durability = 0 })
-        end)
-        
-        if not success2 then
-            print("^1[TOOL DURABILITY]^7 Failed to add broken tool: " .. brokenName)
-            -- Try to give back original tool to prevent item loss
-            pcall(function()
-                exports.vorp_inventory:addItem(source, toolData.name, 1, { durability = 1 })
-            end)
-            return false
-        end
-        
-        -- Notify player
-        local User = VORPcore.getUser(source)
-        if User then
-            VORPcore.NotifyRightTip(source, "~r~Your " .. toolData.name:gsub("_", " ") .. " has broken!", 4000)
-        end
-        
-        print("^3[TOOL DURABILITY]^7 Tool broken: " .. toolData.name .. " -> " .. brokenName)
-        return true
-        
-    else
-        -- Reduce durability
-        local success = pcall(function()
-            -- Update the existing item's durability
-            exports.vorp_inventory:subItem(source, toolData.name, 1, toolData.metadata or {})
-            exports.vorp_inventory:addItem(source, toolData.name, 1, { durability = newDurability })
-        end)
-        
-        if success then
-            print("^3[TOOL DURABILITY]^7 " .. toolData.name .. " durability: " .. toolData.durability .. " -> " .. newDurability)
-            return true
-        else
-            print("^1[TOOL DURABILITY]^7 Failed to update durability for: " .. toolData.name)
-            return false
-        end
-    end
-end
-
--- Get prompt text based on validation result
-function GetWoodcuttingPromptText(validationResult)
-    if validationResult.hasValidTool and validationResult.levelValid then
-        return "CHOP TREE", false -- Text, isDisabled
-    elseif not validationResult.levelValid then
-        return "CHOP TREE (Requires Level " .. (validationResult.requiredLevel or "?") .. ")", true
-    elseif not validationResult.hasValidTool then
-        return "CHOP TREE (Requires Axe)", true
-    else
-        return "CHOP TREE (Error)", true
-    end
-end
-
-print("^2[Atlas Woodcutting]^7 Tool validation functions embedded in main.lua")
+print("^2[Atlas Woodcutting]^7 Main server script loaded (validation from tool_validation.lua)")
 
 -- Helper: Refresh GlobalForests from database
 local function RefreshGlobalForests(callback)
@@ -847,6 +600,9 @@ RegisterCommand('createforest', function(source, args)
                     
                     -- Notify all existing players about the new forest
                     NotifyPlayersOfNewForest(fId, pCoords, radius, tier, name)
+
+                    -- Tell Atlas_blips to refresh its zone data for ALL clients
+                    TriggerEvent('atlas_blips:server:refreshZones')
                 end)
                 
                 VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
@@ -903,6 +659,9 @@ RegisterCommand('wipeforest', function(source, args)
             TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
             VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 All forests wiped by player " .. _source)
+
+            -- Tell Atlas_blips to refresh zone data for ALL clients
+            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     else
         -- Wipe specific forest by ID
@@ -1011,6 +770,9 @@ RegisterCommand('refreshforests', function(source, args)
             VORPcore.NotifyRightTip(_source, "~g~Forest data refreshed successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 Forest data manually refreshed by player " .. _source)
             print("^2[Atlas Woodcutting Admin]^7 Now tracking " .. #GlobalForests .. " forests and " .. #GlobalNodes .. " nodes")
+
+            -- Tell Atlas_blips to refresh zone data for ALL clients
+            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     end)
 end)
