@@ -11,11 +11,11 @@ local ActiveBlips = {} -- {zoneKey = {spriteBlip, radiusBlip}}
 -- RUNTIME HASH COMPUTATION
 -- ============================================================
 
--- Sprite hashes (icon textures)
+-- Sprite hashes (icon textures) — loaded from shared config
 local SpriteHashes = {
-    mining      = GetHashKey("blip_ambient_pickaxe"),   -- -1397823383
-    woodcutting = GetHashKey("blip_event_appleseed"),   -- 1904459580
-    radius      = GetHashKey("blip_radius_search"),     -- 150441873 (confirmed in femga rdr3_discoveries)
+    mining      = GetHashKey(Config.Sprites.mining),
+    woodcutting = GetHashKey(Config.Sprites.woodcutting),
+    radius      = GetHashKey(Config.Sprites.radius),
 }
 
 -- Style hashes (visual behavior category for BlipAddForCoord)

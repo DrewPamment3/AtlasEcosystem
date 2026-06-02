@@ -75,6 +75,49 @@ end)
 -- EVENTS
 -- ============================================================
 
+-- DYNAMIC REFRESH: Called by Atlas_woodcutting / Atlas_mining when nodes change.
+-- Re-fetches ALL zone data from the database and pushes updated data to ALL
+-- connected clients.
+RegisterNetEvent('atlas_blips:server:refreshZones')
+AddEventHandler('atlas_blips:server:refreshZones', function()
+    print("^2[ATLAS BLIPS]^7 External refresh triggered - reloading zone data...")
+    RefreshZoneData("mining", function()
+        RefreshZoneData("woodcutting", function()
+            print("^2[ATLAS BLIPS]^7 Zones refreshed - Mining: " .. #ZoneData.mining ..
+                  ", Woodcutting: " .. #ZoneData.woodcutting)
+
+            -- Push updated data to ALL connected players
+            local allPlayers = GetPlayers()
+            local count = 0
+            for _, playerId in ipairs(allPlayers) do
+                local blipPayload = {}
+
+                -- Package mining zones
+                for _, camp in ipairs(ZoneData.mining) do
+                    table.insert(blipPayload, {
+                        type = "mining", id = camp.id, name = camp.name,
+                        x = camp.x, y = camp.y, z = camp.z,
+                        radius = camp.radius, tier = camp.tier,
+                    })
+                end
+
+                -- Package woodcutting zones
+                for _, forest in ipairs(ZoneData.woodcutting) do
+                    table.insert(blipPayload, {
+                        type = "woodcutting", id = forest.id, name = forest.name,
+                        x = forest.x, y = forest.y, z = forest.z,
+                        radius = forest.radius, tier = forest.tier,
+                    })
+                end
+
+                TriggerClientEvent('atlas_blips:client:loadZones', tonumber(playerId), blipPayload)
+                count = count + 1
+            end
+            print("^2[ATLAS BLIPS]^7 Pushed updated zones to " .. count .. " connected clients")
+        end)
+    end)
+end)
+
 -- Send zone data to a client when they load in
 RegisterServerEvent('atlas_blips:server:playerLoaded')
 AddEventHandler('atlas_blips:server:playerLoaded', function()

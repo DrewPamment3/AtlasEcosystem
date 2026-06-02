@@ -600,6 +600,9 @@ RegisterCommand('createforest', function(source, args)
                     
                     -- Notify all existing players about the new forest
                     NotifyPlayersOfNewForest(fId, pCoords, radius, tier, name)
+
+                    -- Tell Atlas_blips to refresh its zone data for ALL clients
+                    TriggerEvent('atlas_blips:server:refreshZones')
                 end)
                 
                 VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
@@ -656,6 +659,9 @@ RegisterCommand('wipeforest', function(source, args)
             TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
             VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 All forests wiped by player " .. _source)
+
+            -- Tell Atlas_blips to refresh zone data for ALL clients
+            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     else
         -- Wipe specific forest by ID
@@ -764,6 +770,9 @@ RegisterCommand('refreshforests', function(source, args)
             VORPcore.NotifyRightTip(_source, "~g~Forest data refreshed successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 Forest data manually refreshed by player " .. _source)
             print("^2[Atlas Woodcutting Admin]^7 Now tracking " .. #GlobalForests .. " forests and " .. #GlobalNodes .. " nodes")
+
+            -- Tell Atlas_blips to refresh zone data for ALL clients
+            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     end)
 end)

@@ -29,7 +29,7 @@ AtlasBlipsConfig.Colors = {
 AtlasBlipsConfig.Sprites = {
     -- All sprite names confirmed to exist in RDR2 via femga/rdr3_discoveries
     -- texture list: https://github.com/femga/rdr3_discoveries/tree/master/useful_info_from_rpfs/textures/blips
-    mining      = "blip_ambient_pickaxe",   -- Joaat: -1397823383
+    mining      = "blip_gold",              -- Joaat: -1289383059
     woodcutting = "blip_event_appleseed",   -- Joaat: 1904459580 (confirmed working)
     radius      = "blip_radius_search",     -- Joaat: 150441873 (confirmed in femga blip textures)
 }
