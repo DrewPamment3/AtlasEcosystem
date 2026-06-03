@@ -682,6 +682,28 @@ AddEventHandler('atlas_woodcutting:client:loadForests', function(forests, nodes,
     end
 
     print("^2[Atlas Woodcutting]^7 Loaded " .. #forests .. " forests in render range")
+
+    -- Forward subscribed woodcutting zones to Atlas_blips
+    local zonePayload = {}
+    for _, forest in ipairs(forests) do
+        table.insert(zonePayload, {
+            type = "woodcutting",
+            id = forest.id,
+            name = forest.name or ("Forest_" .. forest.id),
+            x = forest.x,
+            y = forest.y,
+            z = forest.z,
+            radius = forest.radius or 15.0,
+            tier = forest.tier
+        })
+    end
+    TriggerEvent('atlas_blips:client:updateWoodcuttingZones', zonePayload)
+end)
+
+-- Receive subscription updates from server (15s cycle) and forward to blips
+RegisterNetEvent('atlas_woodcutting:client:subscriptionsUpdated')
+AddEventHandler('atlas_woodcutting:client:subscriptionsUpdated', function(zonePayload)
+    TriggerEvent('atlas_blips:client:updateWoodcuttingZones', zonePayload)
 end)
 
 RegisterNetEvent('atlas_woodcutting:client:treeChopDeath')

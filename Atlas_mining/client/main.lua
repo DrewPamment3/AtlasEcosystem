@@ -665,6 +665,28 @@ AddEventHandler('atlas_mining:client:loadCamps', function(camps, nodes, campRock
     end
 
     print("^2[LOAD CAMPS]^7 Done — CampRegistry has " .. #CampRegistry .. " entries")
+
+    -- Forward subscribed mining zones to Atlas_blips
+    local zonePayload = {}
+    for _, camp in ipairs(camps) do
+        table.insert(zonePayload, {
+            type = "mining",
+            id = camp.id,
+            name = camp.name or ("Camp_" .. camp.id),
+            x = camp.x,
+            y = camp.y,
+            z = camp.z,
+            radius = camp.radius or 20.0,
+            tier = camp.tier
+        })
+    end
+    TriggerEvent('atlas_blips:client:updateMiningZones', zonePayload)
+end)
+
+-- Receive subscription updates from server (15s cycle) and forward to blips
+RegisterNetEvent('atlas_mining:client:subscriptionsUpdated')
+AddEventHandler('atlas_mining:client:subscriptionsUpdated', function(zonePayload)
+    TriggerEvent('atlas_blips:client:updateMiningZones', zonePayload)
 end)
 
 RegisterNetEvent('atlas_mining:client:rockMinedDeath')

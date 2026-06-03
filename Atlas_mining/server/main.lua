@@ -724,6 +724,24 @@ AddEventHandler('atlas_mining:server:updateSubscriptions', function()
     local playerCoords = GetEntityCoords(ped)
     -- Just update subscriptions, don't send full loadCamps event
     local closestCamps = SubscribePlayerToCamps(_source, playerCoords)
+
+    -- Build blip-friendly zone payload for subscription-based blip system
+    local zonePayload = {}
+    for _, camp in ipairs(closestCamps) do
+        local fullCamp = GetCampById(camp.id)
+        table.insert(zonePayload, {
+            type = "mining",
+            id = camp.id,
+            name = (fullCamp and fullCamp.name) or ("Camp_" .. camp.id),
+            x = camp.x,
+            y = camp.y,
+            z = camp.z,
+            radius = (fullCamp and fullCamp.radius) or 20.0,
+            tier = camp.tier
+        })
+    end
+    TriggerClientEvent('atlas_mining:client:subscriptionsUpdated', _source, zonePayload)
+
     if Config.DebugLogging then
         print("^3[SUBSCRIPTIONS]^7 Updated player " ..
         _source .. " subscriptions - " .. #closestCamps .. " camps in range")
@@ -991,8 +1009,6 @@ RegisterCommand('createcamp', function(source, args)
                         print("^2[CREATE CAMP]^7 GlobalCamps refreshed after creating camp ID " .. cId)
                     end
 
-                    -- Tell Atlas_blips to refresh zone data for ALL clients
-                    TriggerEvent('atlas_blips:server:refreshZones')
                 end)
 
                 VORPcore.NotifyRightTip(_source, "~g~Camp '" .. name .. "' created with " .. count .. " rocks", 4000)
@@ -1049,9 +1065,6 @@ RegisterCommand('wipecamp', function(source, args)
             TriggerClientEvent('atlas_mining:client:wipeAllCamps', -1)
             VORPcore.NotifyRightTip(_source, "~g~All camps wiped successfully", 4000)
             print("^2[Atlas Mining Admin]^7 All camps wiped by player " .. _source)
-
-            -- Tell Atlas_blips to refresh zone data for ALL clients
-            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     else
         -- Wipe specific camp by ID
@@ -1087,9 +1100,6 @@ RegisterCommand('wipecamp', function(source, args)
                             TriggerClientEvent('atlas_mining:client:wipeSpecificCamp', -1, cId)
                             VORPcore.NotifyRightTip(_source, "~g~Camp ID " .. cId .. " wiped successfully", 4000)
                             print("^2[Atlas Mining Admin]^7 Camp ID " .. cId .. " wiped by player " .. _source)
-
-                            -- Tell Atlas_blips to refresh zone data for ALL clients
-                            TriggerEvent('atlas_blips:server:refreshZones')
                         end)
                     end)
                 end)
@@ -1199,9 +1209,6 @@ RegisterCommand('refreshcamps', function(source, args)
             VORPcore.NotifyRightTip(_source, "~g~Camp data refreshed successfully", 4000)
             print("^2[Atlas Mining Admin]^7 Camp data manually refreshed by player " .. _source)
             print("^2[Atlas Mining Admin]^7 Now tracking " .. #GlobalCamps .. " camps and " .. #GlobalNodes .. " nodes")
-
-            -- Tell Atlas_blips to refresh zone data for ALL clients
-            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     end)
 end)

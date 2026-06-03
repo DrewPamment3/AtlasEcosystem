@@ -467,6 +467,23 @@ AddEventHandler('atlas_woodcutting:server:updateSubscriptions', function()
             print("^2[SUBSCRIPTIONS]^7 Sent loadForests to player " .. _source .. " for " .. #newForests .. " new forests")
         end
     end
+
+    -- Build blip-friendly zone payload for subscription-based blip system
+    local zonePayload = {}
+    for _, forest in ipairs(closestForests) do
+        local fullForest = GetForestById(forest.id)
+        table.insert(zonePayload, {
+            type = "woodcutting",
+            id = forest.id,
+            name = (fullForest and fullForest.name) or ("Forest_" .. forest.id),
+            x = forest.x,
+            y = forest.y,
+            z = forest.z,
+            radius = (fullForest and fullForest.radius) or 15.0,
+            tier = forest.tier
+        })
+    end
+    TriggerClientEvent('atlas_woodcutting:client:subscriptionsUpdated', _source, zonePayload)
     
     if Config.DebugLogging then
         print("^3[SUBSCRIPTIONS]^7 Updated player " .. _source .. " subscriptions - " .. #closestForests .. " forests in range")
@@ -600,9 +617,6 @@ RegisterCommand('createforest', function(source, args)
                     
                     -- Notify all existing players about the new forest
                     NotifyPlayersOfNewForest(fId, pCoords, radius, tier, name)
-
-                    -- Tell Atlas_blips to refresh its zone data for ALL clients
-                    TriggerEvent('atlas_blips:server:refreshZones')
                 end)
                 
                 VORPcore.NotifyRightTip(_source, "~g~Forest '" .. name .. "' created with " .. count .. " trees", 4000)
@@ -659,9 +673,6 @@ RegisterCommand('wipeforest', function(source, args)
             TriggerClientEvent('atlas_woodcutting:client:wipeAllForests', -1)
             VORPcore.NotifyRightTip(_source, "~g~All forests wiped successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 All forests wiped by player " .. _source)
-
-            -- Tell Atlas_blips to refresh zone data for ALL clients
-            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     else
         -- Wipe specific forest by ID
@@ -770,9 +781,6 @@ RegisterCommand('refreshforests', function(source, args)
             VORPcore.NotifyRightTip(_source, "~g~Forest data refreshed successfully", 4000)
             print("^2[Atlas Woodcutting Admin]^7 Forest data manually refreshed by player " .. _source)
             print("^2[Atlas Woodcutting Admin]^7 Now tracking " .. #GlobalForests .. " forests and " .. #GlobalNodes .. " nodes")
-
-            -- Tell Atlas_blips to refresh zone data for ALL clients
-            TriggerEvent('atlas_blips:server:refreshZones')
         end)
     end)
 end)
