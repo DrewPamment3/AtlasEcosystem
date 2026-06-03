@@ -124,9 +124,7 @@ AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
     MiningBlips = {}
 
     if not zones or #zones == 0 then
-        if Config.DebugLogging then
-            print("^3[ATLAS BLIPS]^7 No mining zones in range - all mining blips removed")
-        end
+        print("^3[ATLAS BLIPS]^7 No mining zones in range — all mining blips removed")
         return
     end
 
@@ -138,10 +136,7 @@ AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
             created = created + 1
         end
     end
-
-    if Config.DebugLogging then
-        print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " mining blips active")
-    end
+    print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " mining blips active")
 end)
 
 -- Called by Atlas_woodcutting client when subscriptions change
@@ -151,9 +146,7 @@ AddEventHandler('atlas_blips:client:updateWoodcuttingZones', function(zones)
     WoodcuttingBlips = {}
 
     if not zones or #zones == 0 then
-        if Config.DebugLogging then
-            print("^3[ATLAS BLIPS]^7 No woodcutting zones in range - all woodcutting blips removed")
-        end
+        print("^3[ATLAS BLIPS]^7 No woodcutting zones in range — all woodcutting blips removed")
         return
     end
 
@@ -165,10 +158,7 @@ AddEventHandler('atlas_blips:client:updateWoodcuttingZones', function(zones)
             created = created + 1
         end
     end
-
-    if Config.DebugLogging then
-        print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " woodcutting blips active")
-    end
+    print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " woodcutting blips active")
 end)
 
 -- ============================================================
