@@ -63,7 +63,8 @@ end
 
 local function RDR_RemoveBlip(blip)
     if blip and blip ~= 0 then
-        Citizen.InvokeNative(0xDEEDE7C41742E011, blip)
+        -- Verified RDR2 native: RemoveBlip (0xF2C3C9DA47AAA54A)
+        Citizen.InvokeNative(0xF2C3C9DA47AAA54A, blip)
     end
 end
 
