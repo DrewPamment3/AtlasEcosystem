@@ -88,18 +88,24 @@ local function ConfigureBlip(blip, zoneData)
 
     local zoneType   = zoneData.type
     local zoneName   = zoneData.name or (zoneType .. " Zone")
+
+    -- FIXED: Changed from zoneData.coords to direct property mapping
     local x, y, z    = zoneData.x, zoneData.y, zoneData.z
     local radius     = zoneData.radius or 100.0
     local spriteHash = SpriteHashes[zoneType] or GetHashKey("blip_ambient_axe")
     local colorIdx   = Config.Colors[zoneType] or 8
 
-    RDR_SetBlipCoords(blip, x, y, z)
-    RDR_SetBlipSprite(blip, spriteHash, true)
-    RDR_SetBlipName(blip, zoneName)
-    RDR_SetBlipColour(blip, colorIdx)
-    RDR_SetBlipScale(blip, Config.SpriteScale)
-    RDR_SetBlipRadius(blip, radius)
-    RDR_SetBlipAlpha(blip, 255)
+    if x and y and z then
+        RDR_SetBlipCoords(blip, x, y, z)
+        RDR_SetBlipSprite(blip, spriteHash, true)
+        RDR_SetBlipName(blip, zoneName)
+        RDR_SetBlipColour(blip, colorIdx)
+        RDR_SetBlipScale(blip, Config.SpriteScale)
+        RDR_SetBlipRadius(blip, radius)
+        RDR_SetBlipAlpha(blip, 255)
+    else
+        print("^1[ATLAS BLIPS]^7 Critical Error: Failed to configure blip due to missing X, Y, Z coordinates.")
+    end
 end
 
 -- ============================================================
@@ -109,13 +115,12 @@ end
 local function UpdateZoneBlips(pool, zones, zoneType)
     InitPool(pool)
 
-    -- Count elements safely (handles both standard arrays and dictionary payloads)
     local zoneCount = 0
     if zones then
         for _ in pairs(zones) do zoneCount = zoneCount + 1 end
     end
 
-    -- Step 1: Deactivate and hide all currently active blips in this specific pool
+    -- Step 1: Deactivate and hide all currently active blips in this pool
     for i = 1, MAX_BLIPS do
         if pool[i].active then
             HideBlip(pool[i].handle)
@@ -137,12 +142,11 @@ local function UpdateZoneBlips(pool, zones, zoneType)
         zi = zi + 1
         if zi > MAX_BLIPS then break end
 
-        -- Inject type if missing from the source script event
         if not zoneData.type then zoneData.type = zoneType end
 
         local needNewHandle = true
 
-        -- Reuse check for an already allocated handle
+        -- Reuse check
         for i = 1, MAX_BLIPS do
             if not pool[i].active and pool[i].handle ~= 0 then
                 ConfigureBlip(pool[i].handle, zoneData)
@@ -155,20 +159,23 @@ local function UpdateZoneBlips(pool, zones, zoneType)
             end
         end
 
-        -- New creation check if pool slot is empty
+        -- New creation check
         if needNewHandle then
             for i = 1, MAX_BLIPS do
                 if pool[i].handle == 0 then
                     local x, y, z = zoneData.x, zoneData.y, zoneData.z
-                    local handle = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
 
-                    if handle and handle ~= 0 then
-                        ConfigureBlip(handle, zoneData)
-                        SetBlipVisibility(handle, true)
-                        pool[i].handle = handle
-                        pool[i].active = true
-                        pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
-                        activeCount = activeCount + 1
+                    if x and y and z then
+                        local handle = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
+
+                        if handle and handle ~= 0 then
+                            ConfigureBlip(handle, zoneData)
+                            SetBlipVisibility(handle, true)
+                            pool[i].handle = handle
+                            pool[i].active = true
+                            pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
+                            activeCount = activeCount + 1
+                        end
                     end
                     break
                 end
