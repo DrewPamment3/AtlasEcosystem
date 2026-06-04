@@ -1,29 +1,29 @@
 print("^2[ATLAS BLIPS CLIENT]^7 Client script loaded. Subscription-based blip system.")
 
-local Config = AtlasBlipsConfig
+local Config              = AtlasBlipsConfig
 
 -- ============================================================
 -- RUNTIME HASH COMPUTATION
 -- ============================================================
 
-local SpriteHashes = {
+local SpriteHashes        = {
     mining      = GetHashKey(Config.Sprites.mining),
     woodcutting = GetHashKey(Config.Sprites.woodcutting),
     radius      = GetHashKey(Config.Sprites.radius),
 }
 
-local BLIP_STYLE_MISSION = GetHashKey("BLIP_STYLE_MISSION")
-local BLIP_STYLE_RADIUS  = GetHashKey("BLIP_STYLE_RADIUS")
+local BLIP_STYLE_MISSION  = GetHashKey("BLIP_STYLE_MISSION")
+local BLIP_STYLE_RADIUS   = GetHashKey("BLIP_STYLE_RADIUS")
 
 -- ============================================================
 -- BLIP POOL (reuse handles instead of creating/destroying)
 -- ============================================================
 
 -- Max concurrent blips per type (reasonable upper bound)
-local MAX_BLIPS = 50
+local MAX_BLIPS           = 50
 
 -- Pool of pre-allocated blip handles per type
-local MiningBlipPool = {}    -- { [1..MAX_BLIPS] = { handle, active, zoneKey } }
+local MiningBlipPool      = {} -- { [1..MAX_BLIPS] = { handle, active, zoneKey } }
 local WoodcuttingBlipPool = {}
 
 -- Initialize pools on first use
@@ -53,14 +53,14 @@ end
 
 local function RDR_SetBlipDisplay(blip, displayType)
     -- displayType: 0 = hidden, 1 = hidden, 2 = both minimap & map, 3 = map only, 4 = map only, 5 = minimap only
-    -- Correct RedM native hash for SET_BLIP_DISPLAY
     Citizen.InvokeNative(0x9029B2F3DA924928, blip, displayType)
 end
 
 -- Helper to hide/show blips properly in RedM with handle validation
 local function SetBlipVisibility(blip, visible)
     if blip and blip ~= 0 and DoesBlipExist(blip) then
-        local displayId = visible and 2 or 0 -- 2 = show on both, 0 = completely hide
+        -- 3 = show on main map only (matches your original setup). Change to 2 if you want it on the minimap too.
+        local displayId = visible and 3 or 0
         RDR_SetBlipDisplay(blip, displayId)
     else
         print("^1[ATLAS BLIPS]^7 Invalid blip handle passed to SetBlipVisibility.")
@@ -84,11 +84,10 @@ local function RDR_SetBlipRadius(blip, radius)
 end
 
 local function RDR_SetBlipCoords(blip, x, y, z)
-    -- SetBlipCoords: 0xC2F84B7F9C4D0C61
     Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
 end
 
--- Hide a blip using proper display native (SetBlipDisplay is now confirmed working)
+-- Hide a blip using proper display native
 local function HideBlip(blip)
     SetBlipVisibility(blip, false)
 end
@@ -105,7 +104,6 @@ local function ConfigureBlip(blip, zoneData)
     RDR_SetBlipCoords(blip, x, y, z)
     RDR_SetBlipSprite(blip, spriteHash, true)
     RDR_SetBlipName(blip, zoneName)
-    RDR_SetBlipDisplay(blip, 3)
     RDR_SetBlipColour(blip, colorIdx)
     RDR_SetBlipScale(blip, Config.SpriteScale)
     RDR_SetBlipRadius(blip, radius)
@@ -123,7 +121,7 @@ local function UpdateZoneBlips(pool, zones, zoneType)
 
     if not zones then zones = {} end
 
-    -- Step 1: Deactivate all currently active blips
+    -- Step 1: Deactivate all currently active blips and hide them
     for i = 1, MAX_BLIPS do
         if pool[i].active then
             HideBlip(pool[i].handle)
@@ -149,6 +147,7 @@ local function UpdateZoneBlips(pool, zones, zoneType)
             if not pool[i].active and pool[i].handle ~= 0 then
                 -- Reuse this handle
                 ConfigureBlip(pool[i].handle, zoneData)
+                SetBlipVisibility(pool[i].handle, true) -- Explicitly turn visibility back on
                 pool[i].active = true
                 pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
                 needNewHandle = false
@@ -165,6 +164,7 @@ local function UpdateZoneBlips(pool, zones, zoneType)
                     local handle = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
                     if handle ~= 0 then
                         ConfigureBlip(handle, zoneData)
+                        SetBlipVisibility(handle, true) -- Explicitly turn visibility back on
                         pool[i].handle = handle
                         pool[i].active = true
                         pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
