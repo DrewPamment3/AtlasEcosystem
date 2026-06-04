@@ -757,6 +757,9 @@ AddEventHandler('atlas_mining:client:wipeAllCamps', function()
     CampRegistry = {}
     MinedRockMap = {}
     RenderedCamps = {}
+
+    -- Immediately clear all mining blips
+    TriggerEvent('atlas_blips:client:updateMiningZones', {})
 end)
 
 RegisterNetEvent('atlas_mining:client:spawnSingleNode')

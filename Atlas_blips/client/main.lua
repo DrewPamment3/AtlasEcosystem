@@ -16,14 +16,24 @@ local BLIP_STYLE_MISSION = GetHashKey("BLIP_STYLE_MISSION")
 local BLIP_STYLE_RADIUS  = GetHashKey("BLIP_STYLE_RADIUS")
 
 -- ============================================================
--- BLIP STATE (per-type, not global)
+-- BLIP POOL (reuse handles instead of creating/destroying)
 -- ============================================================
 
--- Mining blips: { [zoneKey] = { spriteBlip = handle, radiusBlip = nil } }
-local MiningBlips = {}
+-- Max concurrent blips per type (reasonable upper bound)
+local MAX_BLIPS = 50
 
--- Woodcutting blips
-local WoodcuttingBlips = {}
+-- Pool of pre-allocated blip handles per type
+local MiningBlipPool = {}    -- { [1..MAX_BLIPS] = { handle, active, zoneKey } }
+local WoodcuttingBlipPool = {}
+
+-- Initialize pools on first use
+local function InitPool(pool)
+    if #pool == 0 then
+        for i = 1, MAX_BLIPS do
+            pool[i] = { handle = 0, active = false, zoneKey = nil }
+        end
+    end
+end
 
 -- ============================================================
 -- RDR2 NATIVE HELPERS
@@ -61,18 +71,21 @@ local function RDR_SetBlipRadius(blip, radius)
     Citizen.InvokeNative(0x340CF8A9750E9669, blip, radius)
 end
 
-local function RDR_RemoveBlip(blip)
+local function RDR_SetBlipCoords(blip, x, y, z)
+    -- SetBlipCoords: 0xC2F84B7F9C4D0C61
+    Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
+end
+
+-- Hide a blip without deallocating it (safe, no native crash risk)
+local function HideBlip(blip)
     if blip and blip ~= 0 then
-        -- Verified RDR2 native: RemoveBlip (0xF2C3C9DA47AAA54A)
-        Citizen.InvokeNative(0xF2C3C9DA47AAA54A, blip)
+        RDR_SetBlipDisplay(blip, 0)  -- Hidden on all views
+        RDR_SetBlipAlpha(blip, 0)    -- Fully transparent
     end
 end
 
--- ============================================================
--- BLIP CREATION / DESTRUCTION
--- ============================================================
-
-local function CreateZoneBlip(zoneData)
+-- Show/update a blip with new data
+local function ConfigureBlip(blip, zoneData)
     local zoneType   = zoneData.type
     local zoneName   = zoneData.name or (zoneType .. " Zone")
     local x, y, z    = zoneData.x, zoneData.y, zoneData.z
@@ -80,100 +93,99 @@ local function CreateZoneBlip(zoneData)
     local spriteHash = SpriteHashes[zoneType]
     local colorIdx   = Config.Colors[zoneType] or 8
 
-    if not Config.ShowBlips[zoneType] then
-        return nil
-    end
+    RDR_SetBlipCoords(blip, x, y, z)
+    RDR_SetBlipSprite(blip, spriteHash, true)
+    RDR_SetBlipName(blip, zoneName)
+    RDR_SetBlipDisplay(blip, 3)
+    RDR_SetBlipColour(blip, colorIdx)
+    RDR_SetBlipScale(blip, Config.SpriteScale)
+    RDR_SetBlipRadius(blip, radius)
+    RDR_SetBlipAlpha(blip, 255)
 
-    local spriteBlip = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
-    if not spriteBlip or spriteBlip == 0 then
-        print("^1[ATLAS BLIPS]^7 Failed to create icon blip for " .. zoneType .. " '" .. zoneName .. "'")
-        return nil
-    end
-
-    RDR_SetBlipSprite(spriteBlip, spriteHash, true)
-    RDR_SetBlipName(spriteBlip, zoneName)
-    RDR_SetBlipDisplay(spriteBlip, 3)
-    RDR_SetBlipColour(spriteBlip, colorIdx)
-    RDR_SetBlipScale(spriteBlip, Config.SpriteScale)
-    RDR_SetBlipRadius(spriteBlip, radius)
-    RDR_SetBlipAlpha(spriteBlip, 255)
-
-    if Config.DebugLogging then
-        print("^2[ATLAS BLIPS]^7 Created " .. zoneType .. " blip: '" .. zoneName .. "' at (" .. string.format("%.1f", x) .. ", " .. string.format("%.1f", y) .. ") radius=" .. radius)
-    end
-
-    return { spriteBlip = spriteBlip, radiusBlip = nil }
+    return { blip = blip }
 end
 
-local function RemoveAllBlipsOfType(blipStore)
-    for _, pair in pairs(blipStore) do
-        RDR_RemoveBlip(pair.spriteBlip)
-        if pair.radiusBlip and pair.radiusBlip ~= 0 then
-            RDR_RemoveBlip(pair.radiusBlip)
+-- ============================================================
+-- POOL-BASED ZONE UPDATER
+-- ============================================================
+
+local function UpdateZoneBlips(pool, zones, zoneType)
+    InitPool(pool)
+
+    if not zones then zones = {} end
+
+    -- Step 1: Deactivate all currently active blips
+    for i = 1, MAX_BLIPS do
+        if pool[i].active then
+            HideBlip(pool[i].handle)
+            pool[i].active = false
+            pool[i].zoneKey = nil
         end
     end
+
+    if #zones == 0 then
+        print("^3[ATLAS BLIPS]^7 No " .. zoneType .. " zones in range — all " .. zoneType .. " blips hidden")
+        return
+    end
+
+    -- Step 2: Assign zones to pool slots (create new handles only if needed)
+    local activeCount = 0
+    for zi, zoneData in ipairs(zones) do
+        if zi > MAX_BLIPS then break end -- Safety cap
+
+        local needNewHandle = true
+
+        -- Try to find a matching deactivated handle to reuse
+        for i = 1, MAX_BLIPS do
+            if not pool[i].active and pool[i].handle ~= 0 then
+                -- Reuse this handle
+                ConfigureBlip(pool[i].handle, zoneData)
+                pool[i].active = true
+                pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
+                needNewHandle = false
+                activeCount = activeCount + 1
+                break
+            end
+        end
+
+        -- If no available deactivated handle, create a new one
+        if needNewHandle then
+            for i = 1, MAX_BLIPS do
+                if pool[i].handle == 0 then
+                    local x, y, z = zoneData.x, zoneData.y, zoneData.z
+                    local handle = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
+                    if handle ~= 0 then
+                        ConfigureBlip(handle, zoneData)
+                        pool[i].handle = handle
+                        pool[i].active = true
+                        pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
+                        activeCount = activeCount + 1
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    print("^2[ATLAS BLIPS]^7 Subscription update: " .. activeCount .. " " .. zoneType .. " blips active")
 end
 
 -- ============================================================
 -- SUBSCRIPTION-BASED ZONE HANDLERS (called by mining / woodcutting)
 -- ============================================================
 
--- Called by Atlas_mining client when subscriptions change
 AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
-    -- Remove all existing mining blips
-    RemoveAllBlipsOfType(MiningBlips)
-    MiningBlips = {}
-
-    if not zones or #zones == 0 then
-        print("^3[ATLAS BLIPS]^7 No mining zones in range — all mining blips removed")
-        return
-    end
-
-    local created = 0
-    for _, zoneData in ipairs(zones) do
-        local pair = CreateZoneBlip(zoneData)
-        if pair then
-            MiningBlips["mining_" .. (zoneData.id or created)] = pair
-            created = created + 1
-        end
-    end
-    print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " mining blips active")
+    UpdateZoneBlips(MiningBlipPool, zones, "mining")
 end)
 
--- Called by Atlas_woodcutting client when subscriptions change
 AddEventHandler('atlas_blips:client:updateWoodcuttingZones', function(zones)
-    -- Remove all existing woodcutting blips
-    RemoveAllBlipsOfType(WoodcuttingBlips)
-    WoodcuttingBlips = {}
-
-    if not zones or #zones == 0 then
-        print("^3[ATLAS BLIPS]^7 No woodcutting zones in range — all woodcutting blips removed")
-        return
-    end
-
-    local created = 0
-    for _, zoneData in ipairs(zones) do
-        local pair = CreateZoneBlip(zoneData)
-        if pair then
-            WoodcuttingBlips["woodcutting_" .. (zoneData.id or created)] = pair
-            created = created + 1
-        end
-    end
-    print("^2[ATLAS BLIPS]^7 Subscription update: " .. created .. " woodcutting blips active")
+    UpdateZoneBlips(WoodcuttingBlipPool, zones, "woodcutting")
 end)
 
 -- ============================================================
 -- RESOURCE STOP CLEANUP
 -- ============================================================
+-- NOTE: We don't attempt to remove blips (natives crash).
+-- Hiding via display/alpha is sufficient — they disappear on next resource restart.
 
-AddEventHandler('onResourceStop', function(resourceName)
-    if resourceName == GetCurrentResourceName() then
-        RemoveAllBlipsOfType(MiningBlips)
-        RemoveAllBlipsOfType(WoodcuttingBlips)
-        MiningBlips = {}
-        WoodcuttingBlips = {}
-        print("^2[ATLAS BLIPS]^7 All blips cleaned up on resource stop")
-    end
-end)
-
-print("^2[ATLAS BLIPS CLIENT]^7 Ready — Subscription-based blip system active.")
+print("^2[ATLAS BLIPS CLIENT]^7 Ready — Pool-based blip system active (no RemoveBlip needed).")

@@ -763,6 +763,8 @@ AddEventHandler('atlas_woodcutting:client:wipeSpecificForest', function(forestId
             table.remove(GroveRegistry, i)
         end
     end
+    -- Re-request subscriptions to update blips (specific forest was wiped)
+    TriggerServerEvent('atlas_woodcutting:server:updateSubscriptions')
 end)
 
 RegisterNetEvent('atlas_woodcutting:client:wipeAllForests')
@@ -774,6 +776,9 @@ AddEventHandler('atlas_woodcutting:client:wipeAllForests', function()
     GroveRegistry = {}
     TreeStumpMap = {}
     RenderedForests = {}
+
+    -- Immediately clear all woodcutting blips
+    TriggerEvent('atlas_blips:client:updateWoodcuttingZones', {})
 end)
 
 RegisterNetEvent('atlas_woodcutting:client:spawnSingleNode')
