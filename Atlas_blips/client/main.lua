@@ -76,11 +76,14 @@ local function RDR_SetBlipCoords(blip, x, y, z)
     Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
 end
 
--- Hide a blip without deallocating it (safe, no native crash risk)
+-- Hide a blip without deallocating it (REMOVEBLIP native crashes RDR2)
+-- Kill every visual property so nothing renders on map
 local function HideBlip(blip)
     if blip and blip ~= 0 then
-        RDR_SetBlipDisplay(blip, 0)  -- Hidden on all views
-        RDR_SetBlipAlpha(blip, 0)    -- Fully transparent
+        RDR_SetBlipAlpha(blip, 0)
+        RDR_SetBlipScale(blip, 0.0)
+        RDR_SetBlipRadius(blip, 0)
+        RDR_SetBlipDisplay(blip, 0)
     end
 end
 
