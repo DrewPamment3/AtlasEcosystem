@@ -59,7 +59,7 @@ end
 -- Helper to hide/show blips properly in RedM with handle validation
 local function SetBlipVisibility(blip, visible)
     if blip and blip ~= 0 and DoesBlipExist(blip) then
-        -- 3 = show on main map only (matches your original setup). Change to 2 if you want it on the minimap too.
+        -- 3 = show on main map only. Change to 2 if you want it on the minimap too.
         local displayId = visible and 3 or 0
         RDR_SetBlipDisplay(blip, displayId)
     else
@@ -87,6 +87,11 @@ local function RDR_SetBlipCoords(blip, x, y, z)
     Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
 end
 
+local function RDR_SetBlipLinks(blip, toggle)
+    -- Disables/Enables pinning/tracking to the edge of the minimap radar
+    Citizen.InvokeNative(0xBBDC2737699971D4, blip, toggle)
+end
+
 -- Hide a blip using proper display native
 local function HideBlip(blip)
     SetBlipVisibility(blip, false)
@@ -108,6 +113,9 @@ local function ConfigureBlip(blip, zoneData)
     RDR_SetBlipScale(blip, Config.SpriteScale)
     RDR_SetBlipRadius(blip, radius)
     RDR_SetBlipAlpha(blip, 255)
+
+    -- Strip edge tracking behavior entirely
+    RDR_SetBlipLinks(blip, false)
 
     return { blip = blip }
 end
