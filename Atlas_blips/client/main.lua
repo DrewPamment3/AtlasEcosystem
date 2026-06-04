@@ -194,7 +194,8 @@ AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
     UpdateZoneBlips(MiningBlipPool, zones, "mining")
 end)
 
-AddEventHandler('atlas_blips:client:updateWoodcuttingZones', function(zones)
+-- FIXED: Now matches the exact event name fired by atlas_woodcutting server script
+AddEventHandler('atlas_woodcutting:client:subscriptionsUpdated', function(zones)
     UpdateZoneBlips(WoodcuttingBlipPool, zones, "woodcutting")
 end)
 
