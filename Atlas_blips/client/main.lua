@@ -194,7 +194,8 @@ AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
     UpdateZoneBlips(MiningBlipPool, zones, "mining")
 end)
 
--- FIXED: Now matches the exact event name fired by atlas_woodcutting server script
+-- FIXED: Registered as a net event so the server can safely pass data over the network
+RegisterNetEvent('atlas_woodcutting:client:subscriptionsUpdated')
 AddEventHandler('atlas_woodcutting:client:subscriptionsUpdated', function(zones)
     UpdateZoneBlips(WoodcuttingBlipPool, zones, "woodcutting")
 end)
