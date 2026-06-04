@@ -52,7 +52,19 @@ local function RDR_SetBlipName(blip, name)
 end
 
 local function RDR_SetBlipDisplay(blip, displayType)
-    Citizen.InvokeNative(0xA1509A8E850B0347, blip, displayType)
+    -- displayType: 0 = hidden, 1 = hidden, 2 = both minimap & map, 3 = map only, 4 = map only, 5 = minimap only
+    -- Correct RedM native hash for SET_BLIP_DISPLAY
+    Citizen.InvokeNative(0x9029B2F3DA924928, blip, displayType)
+end
+
+-- Helper to hide/show blips properly in RedM with handle validation
+local function SetBlipVisibility(blip, visible)
+    if blip and blip ~= 0 and DoesBlipExist(blip) then
+        local displayId = visible and 2 or 0 -- 2 = show on both, 0 = completely hide
+        RDR_SetBlipDisplay(blip, displayId)
+    else
+        print("^1[ATLAS BLIPS]^7 Invalid blip handle passed to SetBlipVisibility.")
+    end
 end
 
 local function RDR_SetBlipColour(blip, colourIndex)
@@ -76,15 +88,9 @@ local function RDR_SetBlipCoords(blip, x, y, z)
     Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
 end
 
--- Hide a blip without deallocating it (REMOVEBLIP native crashes RDR2)
--- Kill every visual property so nothing renders on map
+-- Hide a blip using proper display native (SetBlipDisplay is now confirmed working)
 local function HideBlip(blip)
-    if blip and blip ~= 0 then
-        RDR_SetBlipAlpha(blip, 0)
-        RDR_SetBlipScale(blip, 0.0)
-        RDR_SetBlipRadius(blip, 0)
-        RDR_SetBlipDisplay(blip, 0)
-    end
+    SetBlipVisibility(blip, false)
 end
 
 -- Show/update a blip with new data
