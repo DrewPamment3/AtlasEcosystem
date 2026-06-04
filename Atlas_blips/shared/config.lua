@@ -1,201 +1,73 @@
-print("^2[ATLAS BLIPS CLIENT]^7 Client script loaded. Subscription-based blip system.")
-
-local Config              = AtlasBlipsConfig
+AtlasBlipsConfig = {}
 
 -- ============================================================
--- RUNTIME HASH COMPUTATION
+-- GENERAL SETTINGS
 -- ============================================================
 
-local SpriteHashes        = {
-    mining      = GetHashKey(Config.Sprites.mining),
-    woodcutting = GetHashKey(Config.Sprites.woodcutting),
-    radius      = GetHashKey(Config.Sprites.radius),
+-- Enable verbose console logging
+AtlasBlipsConfig.DebugLogging = true
+
+-- ============================================================
+-- BLIP APPEARANCE
+-- ============================================================
+
+-- RDR2 Blip Color indices (INTEGER values, NOT hex color codes)
+-- These are indices into the game's internal blip color palette
+-- Common RDR2 values:
+--   1 = Red, 2 = Green, 3 = Blue, 4 = White (player),
+--   5 = Yellow, 6 = Orange, 7 = Light Blue, 8 = Grey,
+--   11 = Dark Grey, 25 = Brown/Dark Orange, 27 = Light Brown
+--   Full list: https://alloc8or.re/rdr3/doc/blips/
+AtlasBlipsConfig.Colors = {
+    mining      = 8,  -- Grey
+    woodcutting = 27, -- Light Brown (native palette index)
 }
 
--- Changed to DESTINATION style to naturally drop radar edge tracking
-local BLIP_STYLE_MISSION  = GetHashKey("BLIP_STYLE_DESTINATION")
-local BLIP_STYLE_RADIUS   = GetHashKey("BLIP_STYLE_RADIUS")
+-- RDR2 Blip Sprite Hash (Joaat integer)
+-- These should be computed from the string name via GetHashKey()
+-- But we define known-good values explicitly here for reference
+AtlasBlipsConfig.Sprites = {
+    -- All sprite names confirmed to exist in RDR2 via femga/rdr3_discoveries
+    -- texture list: https://github.com/femga/rdr3_discoveries/tree/master/useful_info_from_rpfs/textures/blips
+    mining      = "blip_gold",            -- Joaat: -1289383059
+    woodcutting = "blip_event_appleseed", -- Joaat: 1904459580 (confirmed working)
+    radius      = "blip_radius_search",   -- Joaat: 150441873 (confirmed in femga blip textures)
+}
+
+-- Radius Blip Alpha (0-255)
+-- 128 = 50% transparent, makes the circle semi-transparent so it doesn't
+-- block the underlying map terrain
+AtlasBlipsConfig.RadiusAlpha = 128
+
+-- Scale of the sprite blip (icon size on minimap/world map)
+-- RDR2 blips are naturally larger than GTA V
+-- 0.3-0.6 is a good range for visible but not oversized
+AtlasBlipsConfig.SpriteScale = 0.4
 
 -- ============================================================
--- BLIP POOL (reuse handles instead of creating/destroying)
+-- BLIP DISPLAY CATEGORIES
 -- ============================================================
 
--- Max concurrent blips per type (reasonable upper bound)
-local MAX_BLIPS           = 50
-
--- Pool of pre-allocated blip handles per type
-local MiningBlipPool      = {} -- { [1..MAX_BLIPS] = { handle, active, zoneKey } }
-local WoodcuttingBlipPool = {}
-
--- Initialize pools on first use
-local function InitPool(pool)
-    if #pool == 0 then
-        for i = 1, MAX_BLIPS do
-            pool[i] = { handle = 0, active = false, zoneKey = nil }
-        end
-    end
-end
+-- Toggle which types of blips are shown on the map
+AtlasBlipsConfig.ShowBlips = {
+    mining      = true,
+    woodcutting = true,
+}
 
 -- ============================================================
--- RDR2 NATIVE HELPERS
+-- DATABASE SETTINGS
 -- ============================================================
 
-local function RDR_BlipAddForCoord(styleHash, x, y, z)
-    return Citizen.InvokeNative(0x554D9D53F696D002, styleHash, x, y, z)
-end
-
-local function RDR_SetBlipSprite(blip, spriteHash, toggle)
-    Citizen.InvokeNative(0x74F74D3207ED525C, blip, spriteHash, toggle or true)
-end
-
-local function RDR_SetBlipName(blip, name)
-    Citizen.InvokeNative(0x9CB1A1623062F402, blip, name)
-end
-
-local function RDR_SetBlipDisplay(blip, displayType)
-    -- displayType: 0 = hidden, 1 = hidden, 2 = both minimap & map, 3 = map only, 4 = map only, 5 = minimap only
-    Citizen.InvokeNative(0x9029B2F3DA924928, blip, displayType)
-end
-
--- Helper to hide/show blips properly in RedM with handle validation
-local function SetBlipVisibility(blip, visible)
-    if blip and blip ~= 0 and DoesBlipExist(blip) then
-        -- 3 = show on main map only. Change to 2 if you want it on the minimap too.
-        local displayId = visible and 3 or 0
-        RDR_SetBlipDisplay(blip, displayId)
-    else
-        print("^1[ATLAS BLIPS]^7 Invalid blip handle passed to SetBlipVisibility.")
-    end
-end
-
-local function RDR_SetBlipColour(blip, colourIndex)
-    Citizen.InvokeNative(0x03D7FB09E75D6B7E, blip, colourIndex)
-end
-
-local function RDR_SetBlipScale(blip, scale)
-    Citizen.InvokeNative(0xD38744167B2FA257, blip, scale)
-end
-
-local function RDR_SetBlipAlpha(blip, alpha)
-    Citizen.InvokeNative(0x45FF974EEE1C8734, blip, alpha)
-end
-
-local function RDR_SetBlipRadius(blip, radius)
-    Citizen.InvokeNative(0x340CF8A9750E9669, blip, radius)
-end
-
-local function RDR_SetBlipCoords(blip, x, y, z)
-    Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
-end
-
--- Hide a blip using proper display native
-local function HideBlip(blip)
-    SetBlipVisibility(blip, false)
-end
-
--- Show/update a blip with new data
-local function ConfigureBlip(blip, zoneData)
-    local zoneType   = zoneData.type
-    local zoneName   = zoneData.name or (zoneType .. " Zone")
-    local x, y, z    = zoneData.x, zoneData.y, zoneData.z
-    local radius     = zoneData.radius or 100.0
-    local spriteHash = SpriteHashes[zoneType]
-    local colorIdx   = Config.Colors[zoneType] or 8
-
-    RDR_SetBlipCoords(blip, x, y, z)
-    RDR_SetBlipSprite(blip, spriteHash, true)
-    RDR_SetBlipName(blip, zoneName)
-    RDR_SetBlipColour(blip, colorIdx)
-    RDR_SetBlipScale(blip, Config.SpriteScale)
-    RDR_SetBlipRadius(blip, radius)
-    RDR_SetBlipAlpha(blip, 255)
-
-    return { blip = blip }
-end
+-- Tables queried for zone data on resource start
+AtlasBlipsConfig.Tables = {
+    mining      = "atlas_mining_camps",
+    woodcutting = "atlas_woodcutting_forests",
+}
 
 -- ============================================================
--- POOL-BASED ZONE UPDATER
+-- CLIENT SETTINGS
 -- ============================================================
 
-local function UpdateZoneBlips(pool, zones, zoneType)
-    InitPool(pool)
-
-    if not zones then zones = {} end
-
-    -- Step 1: Deactivate all currently active blips and hide them
-    for i = 1, MAX_BLIPS do
-        if pool[i].active then
-            HideBlip(pool[i].handle)
-            pool[i].active = false
-            pool[i].zoneKey = nil
-        end
-    end
-
-    if #zones == 0 then
-        print("^3[ATLAS BLIPS]^7 No " .. zoneType .. " zones in range — all " .. zoneType .. " blips hidden")
-        return
-    end
-
-    -- Step 2: Assign zones to pool slots (create new handles only if needed)
-    local activeCount = 0
-    for zi, zoneData in ipairs(zones) do
-        if zi > MAX_BLIPS then break end -- Safety cap
-
-        local needNewHandle = true
-
-        -- Try to find a matching deactivated handle to reuse
-        for i = 1, MAX_BLIPS do
-            if not pool[i].active and pool[i].handle ~= 0 then
-                -- Reuse this handle
-                ConfigureBlip(pool[i].handle, zoneData)
-                SetBlipVisibility(pool[i].handle, true) -- Explicitly turn visibility back on
-                pool[i].active = true
-                pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
-                needNewHandle = false
-                activeCount = activeCount + 1
-                break
-            end
-        end
-
-        -- If no available deactivated handle, create a new one
-        if needNewHandle then
-            for i = 1, MAX_BLIPS do
-                if pool[i].handle == 0 then
-                    local x, y, z = zoneData.x, zoneData.y, zoneData.z
-                    local handle = RDR_BlipAddForCoord(BLIP_STYLE_MISSION, x, y, z)
-                    if handle ~= 0 then
-                        ConfigureBlip(handle, zoneData)
-                        SetBlipVisibility(handle, true) -- Explicitly turn visibility back on
-                        pool[i].handle = handle
-                        pool[i].active = true
-                        pool[i].zoneKey = zoneType .. "_" .. (zoneData.id or zi)
-                        activeCount = activeCount + 1
-                    end
-                    break
-                end
-            end
-        end
-    end
-
-    print("^2[ATLAS BLIPS]^7 Subscription update: " .. activeCount .. " " .. zoneType .. " blips active")
-end
-
--- ============================================================
--- SUBSCRIPTION-BASED ZONE HANDLERS (called by mining / woodcutting)
--- ============================================================
-
-AddEventHandler('atlas_blips:client:updateMiningZones', function(zones)
-    UpdateZoneBlips(MiningBlipPool, zones, "mining")
-end)
-
-AddEventHandler('atlas_blips:client:updateWoodcuttingZones', function(zones)
-    UpdateZoneBlips(WoodcuttingBlipPool, zones, "woodcutting")
-end)
-
--- ============================================================
--- RESOURCE STOP CLEANUP
--- ============================================================
--- NOTE: We don't attempt to remove blips (natives crash).
--- Hiding via display/alpha is sufficient — they disappear on next resource restart.
-
-print("^2[ATLAS BLIPS CLIENT]^7 Ready — Pool-based blip system active (no RemoveBlip needed).")
+-- Delay (ms) after player loads before requesting zone data
+-- Allow time for the character system and other resources to initialize
+AtlasBlipsConfig.ReconnectBlipDelay = 5000

@@ -12,7 +12,8 @@ local SpriteHashes        = {
     radius      = GetHashKey(Config.Sprites.radius),
 }
 
-local BLIP_STYLE_MISSION  = GetHashKey("BLIP_STYLE_MISSION")
+-- Changed to DESTINATION style to naturally drop radar edge tracking
+local BLIP_STYLE_MISSION  = GetHashKey("BLIP_STYLE_DESTINATION")
 local BLIP_STYLE_RADIUS   = GetHashKey("BLIP_STYLE_RADIUS")
 
 -- ============================================================
@@ -87,11 +88,6 @@ local function RDR_SetBlipCoords(blip, x, y, z)
     Citizen.InvokeNative(0xC2F84B7F9C4D0C61, blip, x, y, z)
 end
 
-local function RDR_SetBlipLinks(blip, toggle)
-    -- Disables/Enables pinning/tracking to the edge of the minimap radar
-    Citizen.InvokeNative(0xBBDC2737699971D4, blip, toggle)
-end
-
 -- Hide a blip using proper display native
 local function HideBlip(blip)
     SetBlipVisibility(blip, false)
@@ -113,9 +109,6 @@ local function ConfigureBlip(blip, zoneData)
     RDR_SetBlipScale(blip, Config.SpriteScale)
     RDR_SetBlipRadius(blip, radius)
     RDR_SetBlipAlpha(blip, 255)
-
-    -- Strip edge tracking behavior entirely
-    RDR_SetBlipLinks(blip, false)
 
     return { blip = blip }
 end
